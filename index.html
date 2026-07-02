@@ -614,6 +614,7 @@ function attachConfigHandlers(){
     }
   };
 }
+function navItem(id, icon, label){
   return `<button class="nav-item ${currentTab===id?'active':''}" data-nav="${id}">
     <span class="ic">${icon}</span><span class="lb">${label}</span>
   </button>`;
