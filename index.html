@@ -525,6 +525,7 @@ function resetOrderForm(){
   orderForm = {
     clientName:'', phone:'', address:'', horario:'',
     items:[{productId: state.products[0] ? state.products[0].id : '', qty:1}],
+    discount:0,
     forceNew:null
   };
 }
@@ -546,6 +547,12 @@ function orderItemsTotal(items){
     const prod = state.products.find(p=>p.id===it.productId);
     return sum + (prod ? prod.price * (it.qty||0) : 0);
   },0);
+}
+
+function orderNetTotal(o){
+  const subtotal = orderItemsTotal(o.items);
+  const discount = Math.min(o.discount||0, subtotal);
+  return Math.max(0, subtotal - discount);
 }
 
 // ---------- Rendering ----------
@@ -614,6 +621,7 @@ function attachConfigHandlers(){
     }
   };
 }
+
 function navItem(id, icon, label){
   return `<button class="nav-item ${currentTab===id?'active':''}" data-nav="${id}">
     <span class="ic">${icon}</span><span class="lb">${label}</span>
@@ -632,7 +640,9 @@ function renderNuevoPedido(){
       ${orderForm.items.length>1 ? `<button class="icon-btn" data-remove-item="${idx}">✕</button>` : '<span style="width:34px;display:inline-block;"></span>'}
     </div>
   `).join('');
-  const total = orderItemsTotal(orderForm.items);
+  const subtotal = orderItemsTotal(orderForm.items);
+  const discount = Math.min(orderForm.discount||0, subtotal);
+  const total = Math.max(0, subtotal - discount);
   const clientList = state.clients.map(c=>`<option value="${c.name}">`).join('');
 
   return `
@@ -666,6 +676,18 @@ function renderNuevoPedido(){
       <label style="margin-top:0;">Productos del pedido</label>
       ${itemsHtml}
       <button class="add-row-btn" id="add-product-row">+ Agregar otro producto</button>
+
+      <label>Descuento ($)</label>
+      <input type="number" min="0" step="1" id="f-discount" value="${orderForm.discount||0}" placeholder="0">
+
+      <div class="order-total" style="border-top:none; padding-top:0; margin-top:8px;">
+        <span>Subtotal</span>
+        <span>${CURRENCY.format(subtotal)}</span>
+      </div>
+      ${discount>0 ? `<div class="order-total" style="border-top:none; padding-top:0; margin-top:2px; color:var(--danger);">
+        <span>Descuento</span>
+        <span>- ${CURRENCY.format(discount)}</span>
+      </div>` : ''}
       <div class="order-total">
         <span>Total pedido</span>
         <span class="amt">${CURRENCY.format(total)}</span>
@@ -691,7 +713,9 @@ function renderTicket(o){
     const p = state.products.find(pp=>pp.id===it.productId);
     return `<div class="prod-line"><span>${it.qty}× ${p?p.name:'(producto eliminado)'}</span><span>${CURRENCY.format((p?p.price:0)*it.qty)}</span></div>`;
   }).join('');
-  const total = orderItemsTotal(o.items);
+  const subtotal = orderItemsTotal(o.items);
+  const discount = Math.min(o.discount||0, subtotal);
+  const total = orderNetTotal(o);
   const waRuta = `https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(`Hola ${o.clientName} 👋, tu pedido de *Fast Pet* está programado para hoy entre las ${o.horario||'la tarde'} hrs. Cualquier consulta, escríbenos por aquí. ¡Gracias por preferirnos! 🐾`)}`;
   const waCamino = `https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(`Hola ${o.clientName} 👋, ¡ya vamos en camino a tu domicilio con tu pedido de *Fast Pet*! 🚚🐾 Llegamos en breve.`)}`;
   return `
@@ -709,6 +733,7 @@ function renderTicket(o){
       <div class="ticket-divider"></div>
       <div class="ticket-products">
         ${prod}
+        ${discount>0 ? `<div class="prod-line" style="color:var(--danger);"><span>Descuento</span><span>- ${CURRENCY.format(discount)}</span></div>` : ''}
         <div class="ticket-total"><span>Total</span><span>${CURRENCY.format(total)}</span></div>
       </div>
       <div class="ticket-actions">
@@ -717,6 +742,7 @@ function renderTicket(o){
       </div>
       <div class="ticket-actions" style="padding-top:0;">
         <button class="btn btn-success btn-sm" data-deliver="${o.id}" style="flex:1;">✅ Marcar entregado</button>
+        <button class="btn btn-outline btn-sm" data-delete-order="${o.id}" style="flex:0; color:var(--danger); border-color:var(--danger);">🗑️ Eliminar</button>
       </div>
     </div>
   `;
@@ -750,10 +776,17 @@ function renderVentas(){
   const delivered = state.orders.filter(o=>o.status==='delivered').sort((a,b)=>b.deliveredAt-a.deliveredAt);
   const today = new Date(); today.setHours(0,0,0,0);
   const todayOrders = delivered.filter(o=>o.deliveredAt >= today.getTime());
-  const todayTotal = todayOrders.reduce((s,o)=>s+orderItemsTotal(o.items),0);
-  const allTotal = delivered.reduce((s,o)=>s+orderItemsTotal(o.items),0);
+  const todayTotal = todayOrders.reduce((s,o)=>s+orderNetTotal(o),0);
+  const allTotal = delivered.reduce((s,o)=>s+orderNetTotal(o),0);
 
   const payLabel = {efectivo:'Efectivo',tarjeta:'Tarjeta',transferencia:'Transferencia',credito:'Crédito',pendiente:'Pendiente'};
+  const payMethods = ['efectivo','tarjeta','transferencia','credito','pendiente'];
+  const byMethod = {};
+  payMethods.forEach(k=>byMethod[k]=0);
+  delivered.forEach(o=>{
+    const key = o.paymentMethod && payMethods.includes(o.paymentMethod) ? o.paymentMethod : 'pendiente';
+    byMethod[key] += orderNetTotal(o);
+  });
 
   return `
     <h2 class="section-title">📊 Ventas</h2>
@@ -767,20 +800,32 @@ function renderVentas(){
         <div class="val">${CURRENCY.format(allTotal)}</div>
       </div>
     </div>
+
+    <label style="margin-top:0;">Total por medio de pago</label>
+    <div class="card" style="padding:10px 14px;">
+      ${payMethods.map(k=>`
+        <div class="line" style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
+          <span class="pill">${payLabel[k]}</span>
+          <span style="font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--primary-dark);">${CURRENCY.format(byMethod[k])}</span>
+        </div>
+      `).join('')}
+    </div>
+
     ${delivered.length ? `<button class="btn btn-outline" style="width:100%; margin-bottom:14px;" id="export-csv">⬇ Exportar CSV para Google Sheets / Excel</button>` : ''}
     ${!delivered.length ? `<div class="empty-state"><div class="paw">📦</div>Todavía no hay ventas registradas.</div>` : delivered.map(o=>{
-      const total = orderItemsTotal(o.items);
+      const total = orderNetTotal(o);
       const items = o.items.map(it=>{
         const p = state.products.find(pp=>pp.id===it.productId);
         return `${it.qty}× ${p?p.name:'—'}`;
       }).join(', ');
       const d = new Date(o.deliveredAt);
+      const payOptsHtml = payMethods.map(k=>`<option value="${k}" ${o.paymentMethod===k?'selected':''}>${payLabel[k]}</option>`).join('');
       return `<div class="sale-row">
         <div class="top"><span>${escapeHtml(o.clientName)}</span><span>${CURRENCY.format(total)}</span></div>
         <div class="line">${items}</div>
         <div class="line">📍 ${escapeHtml(o.address)} · ${d.toLocaleDateString('es-CL')} ${d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</div>
-        <div class="line" style="margin-top:6px; display:flex; gap:6px;">
-          <span class="pill">${payLabel[o.paymentMethod]||o.paymentMethod}</span>
+        <div class="line" style="margin-top:6px; display:flex; gap:6px; align-items:center;">
+          <select data-change-pay="${o.id}" style="width:auto; padding:4px 8px; font-size:11px; border-radius:20px; border:1.5px solid var(--border);">${payOptsHtml}</select>
           <span class="pill">${o.clientType==='nuevo'?'Nuevo':'Antiguo'}</span>
         </div>
       </div>`;
@@ -840,6 +885,11 @@ function attachHandlers(){
     if(addrEl) addrEl.oninput = e=>{ orderForm.address = e.target.value; };
     const horEl = document.getElementById('f-horario');
     if(horEl) horEl.oninput = e=>{ orderForm.horario = e.target.value; };
+    const discEl = document.getElementById('f-discount');
+    if(discEl){
+      discEl.oninput = e=>{ orderForm.discount = Math.max(0, parseInt(e.target.value)||0); };
+      discEl.onblur = ()=>{ render(); };
+    }
 
     const toggleBtn = document.getElementById('toggle-client-type');
     if(toggleBtn) toggleBtn.onclick = ()=>{ orderForm.forceNew = !isNewClient(); render(); };
@@ -872,6 +922,15 @@ function attachHandlers(){
     document.querySelectorAll('[data-deliver]').forEach(el=>{
       el.onclick = ()=>{ paymentModalOrderId = el.dataset.deliver; render(); };
     });
+    document.querySelectorAll('[data-delete-order]').forEach(el=>{
+      el.onclick = ()=>{
+        const id = el.dataset.deleteOrder;
+        const o = state.orders.find(x=>x.id===id);
+        if(o && confirm(`¿Eliminar el pedido de ${o.clientName}? Esta acción no se puede deshacer.`)){
+          deleteOrder(id);
+        }
+      };
+    });
   }
 
   if(paymentModalOrderId){
@@ -887,6 +946,17 @@ function attachHandlers(){
   if(currentTab==='ventas'){
     const exportBtn = document.getElementById('export-csv');
     if(exportBtn) exportBtn.onclick = exportCsv;
+    document.querySelectorAll('[data-change-pay]').forEach(el=>{
+      el.onchange = async ()=>{
+        const o = state.orders.find(x=>x.id===el.dataset.changePay);
+        if(o){
+          o.paymentMethod = el.value;
+          await saveOrders();
+          render();
+          showToast('Medio de pago actualizado ✅');
+        }
+      };
+    });
   }
 
   if(currentTab==='catalogo'){
@@ -926,6 +996,7 @@ async function handleSubmitOrder(){
     address: orderForm.address.trim(),
     horario: orderForm.horario.trim(),
     items: orderForm.items.filter(it=>it.productId),
+    discount: Math.max(0, orderForm.discount||0),
     clientType,
     status: 'pending',
     createdAt: Date.now(),
@@ -946,6 +1017,13 @@ async function handleSubmitOrder(){
   showToast('Pedido agregado a la ruta 🚚');
 }
 
+async function deleteOrder(id){
+  state.orders = state.orders.filter(o=>o.id!==id);
+  await saveOrders();
+  render();
+  showToast('Pedido eliminado 🗑️');
+}
+
 async function confirmDelivery(method){
   const o = state.orders.find(x=>x.id===paymentModalOrderId);
   if(o){
@@ -962,7 +1040,7 @@ async function confirmDelivery(method){
 function exportCsv(){
   const delivered = state.orders.filter(o=>o.status==='delivered').sort((a,b)=>a.deliveredAt-b.deliveredAt);
   const payLabel = {efectivo:'Efectivo',tarjeta:'Tarjeta',transferencia:'Transferencia',credito:'Crédito',pendiente:'Pendiente'};
-  const rows = [['Fecha','Hora','Cliente','Telefono','Direccion','Productos','Total','MedioPago','TipoCliente','Horario']];
+  const rows = [['Fecha','Hora','Cliente','Telefono','Direccion','Productos','Descuento','Total','MedioPago','TipoCliente','Horario']];
   delivered.forEach(o=>{
     const d = new Date(o.deliveredAt);
     const items = o.items.map(it=>{
@@ -973,12 +1051,12 @@ function exportCsv(){
       d.toLocaleDateString('es-CL'),
       d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}),
       o.clientName, o.phone, o.address, items,
-      orderItemsTotal(o.items), payLabel[o.paymentMethod]||o.paymentMethod,
+      o.discount||0, orderNetTotal(o), payLabel[o.paymentMethod]||o.paymentMethod,
       o.clientType, o.horario||''
     ]);
   });
   const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
