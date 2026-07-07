@@ -429,6 +429,7 @@ let toastTimer = null;
 let apiUrl = localStorage.getItem('fastpet_api_url') || '';
 let apiError = false;
 let routeDate = todayISO();
+let ventasMonth = currentMonthISO();
 
 function todayISO(){
   const d = new Date();
@@ -446,6 +447,29 @@ function addDaysISO(iso, days){
 function formatDateNice(iso){
   const d = new Date(iso+'T00:00:00');
   return d.toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long'});
+}
+
+function currentMonthISO(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function monthFromTimestamp(ts){
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function addMonthsISO(iso, delta){
+  const [y,m] = iso.split('-').map(Number);
+  const d = new Date(y, m-1+delta, 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function monthLabelNice(iso){
+  const [y,m] = iso.split('-').map(Number);
+  const d = new Date(y, m-1, 1);
+  const s = d.toLocaleDateString('es-CL', {month:'long', year:'numeric'});
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function uid(prefix){
@@ -514,11 +538,11 @@ async function loadState(){
 
 function defaultProducts(){
   return [
-    {id:uid('p'), brand:'Nómade', name:'Nómade 15kg', price:28000},
-    {id:uid('p'), brand:'Bokato Gold', name:'Bokato Gold 15kg', price:26000},
-    {id:uid('p'), brand:'Master Dog', name:'Master Dog 21kg', price:24000},
-    {id:uid('p'), brand:'Fit Fórmula', name:'Fit Fórmula 15kg', price:22000},
-    {id:uid('p'), brand:'Arena Easy Clean', name:'Arena Easy Clean 10kg', price:9000},
+    {id:uid('p'), brand:'Nómade', name:'Nómade 15kg', price:28000, cost:0},
+    {id:uid('p'), brand:'Bokato Gold', name:'Bokato Gold 15kg', price:26000, cost:0},
+    {id:uid('p'), brand:'Master Dog', name:'Master Dog 21kg', price:24000, cost:0},
+    {id:uid('p'), brand:'Fit Fórmula', name:'Fit Fórmula 15kg', price:22000, cost:0},
+    {id:uid('p'), brand:'Arena Easy Clean', name:'Arena Easy Clean 10kg', price:9000, cost:0},
   ];
 }
 
@@ -589,6 +613,21 @@ function orderNetTotal(o){
   const subtotal = orderItemsTotal(o.items);
   const discount = Math.min(o.discount||0, subtotal);
   return Math.max(0, subtotal - discount);
+}
+
+function orderItemsCost(items){
+  return items.reduce((sum,it)=>{
+    const prod = state.products.find(p=>p.id===it.productId);
+    return sum + (prod ? (prod.cost||0) * (it.qty||0) : 0);
+  },0);
+}
+
+function orderUtilidad(o){
+  return orderNetTotal(o) - orderItemsCost(o.items);
+}
+
+function orderSacos(o){
+  return o.items.reduce((s,it)=>s+(it.qty||0),0);
 }
 
 // ---------- Rendering ----------
@@ -830,20 +869,36 @@ function renderPaymentModal(){
 }
 
 function renderVentas(){
-  const delivered = state.orders.filter(o=>o.status==='delivered').sort((a,b)=>b.deliveredAt-a.deliveredAt);
+  const deliveredAll = state.orders.filter(o=>o.status==='delivered');
   const today = new Date(); today.setHours(0,0,0,0);
-  const todayOrders = delivered.filter(o=>o.deliveredAt >= today.getTime());
+  const todayOrders = deliveredAll.filter(o=>o.deliveredAt >= today.getTime());
   const todayTotal = todayOrders.reduce((s,o)=>s+orderNetTotal(o),0);
-  const allTotal = delivered.reduce((s,o)=>s+orderNetTotal(o),0);
+  const allTotal = deliveredAll.reduce((s,o)=>s+orderNetTotal(o),0);
+
+  const monthOrders = deliveredAll.filter(o=>monthFromTimestamp(o.deliveredAt)===ventasMonth).sort((a,b)=>b.deliveredAt-a.deliveredAt);
+  const isCurrentMonth = ventasMonth===currentMonthISO();
+  const monthVentas = monthOrders.reduce((s,o)=>s+orderNetTotal(o),0);
+  const monthUtilidad = monthOrders.reduce((s,o)=>s+orderUtilidad(o),0);
+  const monthSacos = monthOrders.reduce((s,o)=>s+orderSacos(o),0);
+  const monthClientesNuevos = monthOrders.filter(o=>o.clientType==='nuevo').length;
 
   const payLabel = {efectivo:'Efectivo',tarjeta:'Tarjeta',transferencia:'Transferencia',credito:'Crédito',pendiente:'Pendiente'};
   const payMethods = ['efectivo','tarjeta','transferencia','credito','pendiente'];
   const byMethod = {};
   payMethods.forEach(k=>byMethod[k]=0);
-  delivered.forEach(o=>{
+  monthOrders.forEach(o=>{
     const key = o.paymentMethod && payMethods.includes(o.paymentMethod) ? o.paymentMethod : 'pendiente';
     byMethod[key] += orderNetTotal(o);
   });
+
+  const monthNav = `
+    <div class="row-flex" style="margin:4px 0 12px; align-items:center;">
+      <button type="button" class="btn btn-outline btn-sm" id="ventas-month-prev">◀</button>
+      <div style="flex:2; text-align:center; font-weight:600; color:var(--primary-dark);">${monthLabelNice(ventasMonth)}</div>
+      <button type="button" class="btn btn-outline btn-sm" id="ventas-month-next">▶</button>
+    </div>
+    ${!isCurrentMonth ? `<button type="button" class="btn btn-outline btn-sm" id="ventas-month-current" style="width:100%; margin-bottom:12px;">Volver a este mes</button>` : ''}
+  `;
 
   return `
     <h2 class="section-title">📊 Ventas</h2>
@@ -858,7 +913,31 @@ function renderVentas(){
       </div>
     </div>
 
-    <label style="margin-top:0;">Total por medio de pago</label>
+    <label style="margin-top:0;">📅 Resumen mensual</label>
+    ${monthNav}
+    <div class="summary-bar">
+      <div class="summary-box">
+        <div class="lbl">Ventas del mes</div>
+        <div class="val">${CURRENCY.format(monthVentas)}</div>
+      </div>
+      <div class="summary-box" style="background:var(--success);">
+        <div class="lbl">Utilidad del mes</div>
+        <div class="val">${CURRENCY.format(monthUtilidad)}</div>
+      </div>
+    </div>
+    <div class="summary-bar">
+      <div class="summary-box" style="background:var(--accent-dark);">
+        <div class="lbl">Sacos vendidos</div>
+        <div class="val">${monthSacos}</div>
+      </div>
+      <div class="summary-box" style="background:var(--primary-light);">
+        <div class="lbl">Clientes nuevos</div>
+        <div class="val">${monthClientesNuevos}</div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-outline" style="width:100%; margin-bottom:14px;" id="download-month-summary">🖼️ Descargar resumen del mes (imagen)</button>
+
+    <label style="margin-top:0;">Total por medio de pago (${monthLabelNice(ventasMonth)})</label>
     <div class="card" style="padding:10px 14px;">
       ${payMethods.map(k=>`
         <div class="line" style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
@@ -868,8 +947,8 @@ function renderVentas(){
       `).join('')}
     </div>
 
-    ${delivered.length ? `<button class="btn btn-outline" style="width:100%; margin-bottom:14px;" id="export-csv">⬇ Exportar CSV para Google Sheets / Excel</button>` : ''}
-    ${!delivered.length ? `<div class="empty-state"><div class="paw">📦</div>Todavía no hay ventas registradas.</div>` : delivered.map(o=>{
+    ${monthOrders.length ? `<button class="btn btn-outline" style="width:100%; margin-bottom:14px;" id="export-csv">⬇ Exportar CSV para Google Sheets / Excel</button>` : ''}
+    ${!monthOrders.length ? `<div class="empty-state"><div class="paw">📦</div>No hay ventas registradas en ${monthLabelNice(ventasMonth)}.</div>` : monthOrders.map(o=>{
       const total = orderNetTotal(o);
       const items = o.items.map(it=>{
         const p = state.products.find(pp=>pp.id===it.productId);
@@ -956,11 +1035,19 @@ function renderCatalogo(){
   return `
     <h2 class="section-title">📦 Catálogo de productos</h2>
     <div class="card">
+      <div style="display:flex; gap:8px; margin-bottom:6px; font-size:11px; color:var(--text-muted); font-weight:600;">
+        <span style="flex:1 1 110px;">Marca</span>
+        <span style="flex:1 1 150px;">Producto</span>
+        <span style="flex:1 1 85px;">Precio</span>
+        <span style="flex:1 1 85px;">Costo</span>
+        <span style="width:34px;"></span>
+      </div>
       ${state.products.map((p,idx)=>`
-        <div class="catalog-row">
-          <input type="text" data-cat-idx="${idx}" data-cat-field="brand" value="${escapeHtml(p.brand)}" placeholder="Marca">
-          <input type="text" data-cat-idx="${idx}" data-cat-field="name" value="${escapeHtml(p.name)}" placeholder="Producto">
-          <input type="number" class="price" data-cat-idx="${idx}" data-cat-field="price" value="${p.price}" placeholder="Precio">
+        <div class="catalog-row" style="flex-wrap:wrap;">
+          <input type="text" data-cat-idx="${idx}" data-cat-field="brand" value="${escapeHtml(p.brand)}" placeholder="Marca" style="flex:1 1 110px;">
+          <input type="text" data-cat-idx="${idx}" data-cat-field="name" value="${escapeHtml(p.name)}" placeholder="Producto" style="flex:1 1 150px;">
+          <input type="number" class="price" data-cat-idx="${idx}" data-cat-field="price" value="${p.price}" placeholder="Precio" style="flex:1 1 85px;">
+          <input type="number" class="price" data-cat-idx="${idx}" data-cat-field="cost" value="${p.cost||0}" placeholder="Costo" style="flex:1 1 85px;">
           <button class="icon-btn" data-cat-remove="${idx}">✕</button>
         </div>
       `).join('')}
@@ -1084,8 +1171,9 @@ function attachHandlers(){
   }
 
   if(currentTab==='ventas'){
+    const monthOrdersNow = state.orders.filter(o=>o.status==='delivered' && monthFromTimestamp(o.deliveredAt)===ventasMonth);
     const exportBtn = document.getElementById('export-csv');
-    if(exportBtn) exportBtn.onclick = exportCsv;
+    if(exportBtn) exportBtn.onclick = ()=> exportCsv(monthOrdersNow);
     document.querySelectorAll('[data-change-pay]').forEach(el=>{
       el.onchange = async ()=>{
         const o = state.orders.find(x=>x.id===el.dataset.changePay);
@@ -1097,6 +1185,14 @@ function attachHandlers(){
         }
       };
     });
+    const monthPrevBtn = document.getElementById('ventas-month-prev');
+    if(monthPrevBtn) monthPrevBtn.onclick = ()=>{ ventasMonth = addMonthsISO(ventasMonth,-1); render(); };
+    const monthNextBtn = document.getElementById('ventas-month-next');
+    if(monthNextBtn) monthNextBtn.onclick = ()=>{ ventasMonth = addMonthsISO(ventasMonth,1); render(); };
+    const monthCurBtn = document.getElementById('ventas-month-current');
+    if(monthCurBtn) monthCurBtn.onclick = ()=>{ ventasMonth = currentMonthISO(); render(); };
+    const downloadMonthBtn = document.getElementById('download-month-summary');
+    if(downloadMonthBtn) downloadMonthBtn.onclick = downloadMonthlySummary;
   }
 
   if(currentTab==='catalogo'){
@@ -1104,7 +1200,7 @@ function attachHandlers(){
       el.oninput = ()=>{
         const idx = +el.dataset.catIdx;
         const field = el.dataset.catField;
-        state.products[idx][field] = field==='price' ? (parseInt(el.value)||0) : el.value;
+        state.products[idx][field] = (field==='price'||field==='cost') ? (parseInt(el.value)||0) : el.value;
       };
     });
     document.querySelectorAll('[data-cat-remove]').forEach(el=>{
@@ -1112,7 +1208,7 @@ function attachHandlers(){
     });
     const addP = document.getElementById('add-product');
     if(addP) addP.onclick = ()=>{
-      state.products.push({id:uid('p'), brand:'', name:'', price:0});
+      state.products.push({id:uid('p'), brand:'', name:'', price:0, cost:0});
       render();
     };
     const saveBtn = document.getElementById('save-catalog');
@@ -1214,8 +1310,8 @@ async function confirmDelivery(method){
   showToast('Pedido marcado como entregado ✅');
 }
 
-function exportCsv(){
-  const delivered = state.orders.filter(o=>o.status==='delivered').sort((a,b)=>a.deliveredAt-b.deliveredAt);
+function exportCsv(list){
+  const delivered = [...(list || state.orders.filter(o=>o.status==='delivered'))].sort((a,b)=>a.deliveredAt-b.deliveredAt);
   const payLabel = {efectivo:'Efectivo',tarjeta:'Tarjeta',transferencia:'Transferencia',credito:'Crédito',pendiente:'Pendiente'};
   const rows = [['Fecha','Hora','Cliente','Telefono','Direccion','Productos','Descuento','Total','MedioPago','TipoCliente','Horario']];
   delivered.forEach(o=>{
@@ -1312,6 +1408,69 @@ function downloadManifest(){
   link.href = canvas.toDataURL('image/png');
   link.click();
   showToast('Manifiesto descargado 🖼️');
+}
+
+function downloadMonthlySummary(){
+  const monthOrders = state.orders.filter(o=>o.status==='delivered' && monthFromTimestamp(o.deliveredAt)===ventasMonth);
+  if(!monthOrders.length){ showToast('No hay ventas registradas para este mes'); return; }
+
+  const totalVentas = monthOrders.reduce((s,o)=>s+orderNetTotal(o),0);
+  const totalUtilidad = monthOrders.reduce((s,o)=>s+orderUtilidad(o),0);
+  const totalSacos = monthOrders.reduce((s,o)=>s+orderSacos(o),0);
+  const clientesNuevos = monthOrders.filter(o=>o.clientType==='nuevo').length;
+
+  const W = 720, H = 620;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#FAF7F1';
+  ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = '#1F4B43';
+  ctx.fillRect(0,0,W,110);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 28px sans-serif';
+  ctx.fillText('🐾 Fast Pet — Resumen mensual', 24, 50);
+  ctx.font = '18px sans-serif';
+  ctx.fillStyle = '#CFE3DC';
+  ctx.fillText(monthLabelNice(ventasMonth), 24, 84);
+
+  const stats = [
+    {lbl:'Total ventas', val: CURRENCY.format(totalVentas), color:'#1F4B43'},
+    {lbl:'Utilidad total', val: CURRENCY.format(totalUtilidad), color:'#3F9142'},
+    {lbl:'Sacos vendidos', val: String(totalSacos), color:'#E86F1F'},
+    {lbl:'Clientes nuevos', val: String(clientesNuevos), color:'#2F6358'},
+  ];
+  let y = 150;
+  stats.forEach(s=>{
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#E4DFD3';
+    ctx.lineWidth = 1;
+    roundRect(ctx, 24, y, W-48, 96, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#6B7770';
+    ctx.font = '16px sans-serif';
+    ctx.fillText(s.lbl, 44, y+36);
+
+    ctx.fillStyle = s.color;
+    ctx.font = 'bold 34px monospace';
+    ctx.fillText(s.val, 44, y+76);
+
+    y += 116;
+  });
+
+  ctx.fillStyle = '#B7B0A2';
+  ctx.font = '13px sans-serif';
+  ctx.fillText('Generado el ' + new Date().toLocaleDateString('es-CL') + ' · Fast Pet', 24, H-16);
+
+  const link = document.createElement('a');
+  link.download = `fastpet_resumen_${ventasMonth}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  showToast('Resumen mensual descargado 🖼️');
 }
 
 function roundRect(ctx, x, y, w, h, r){
