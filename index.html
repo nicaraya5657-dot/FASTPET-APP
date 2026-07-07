@@ -417,15 +417,36 @@ let state = {
   products: [],
   clients: [],
   orders: [],
+  expenses: [],
   loaded: false
 };
 let currentTab = 'nuevo';
 let orderForm = null; // draft order
+let expenseForm = null; // draft expense
 let paymentModalOrderId = null;
 let toastMsg = null;
 let toastTimer = null;
 let apiUrl = localStorage.getItem('fastpet_api_url') || '';
 let apiError = false;
+let routeDate = todayISO();
+
+function todayISO(){
+  const d = new Date();
+  const tz = d.getTimezoneOffset()*60000;
+  return new Date(d - tz).toISOString().slice(0,10);
+}
+
+function addDaysISO(iso, days){
+  const d = new Date(iso+'T00:00:00');
+  d.setDate(d.getDate()+days);
+  const tz = d.getTimezoneOffset()*60000;
+  return new Date(d - tz).toISOString().slice(0,10);
+}
+
+function formatDateNice(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long'});
+}
 
 function uid(prefix){
   return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
@@ -477,12 +498,17 @@ async function loadState(){
     const o = await apiGet('orders');
     state.orders = o ? JSON.parse(o) : [];
   }catch(e){ apiError = true; state.orders = []; }
+  try{
+    const ex = await apiGet('expenses');
+    state.expenses = ex ? JSON.parse(ex) : [];
+  }catch(e){ apiError = true; state.expenses = []; }
   if(!apiError && !state.products.length){
     state.products = defaultProducts();
     await saveProducts();
   }
   state.loaded = true;
   resetOrderForm();
+  resetExpenseForm();
   render();
 }
 
@@ -505,6 +531,9 @@ async function saveClients(){
 async function saveOrders(){
   try{ await apiSet('orders', JSON.stringify(state.orders)); }catch(e){ showToast('⚠️ No se pudo guardar (revisa conexión)'); }
 }
+async function saveExpenses(){
+  try{ await apiSet('expenses', JSON.stringify(state.expenses)); }catch(e){ showToast('⚠️ No se pudo guardar (revisa conexión)'); }
+}
 
 function saveApiUrlAndStart(url){
   apiUrl = url.trim();
@@ -526,7 +555,14 @@ function resetOrderForm(){
     clientName:'', phone:'', address:'', horario:'',
     items:[{productId: state.products[0] ? state.products[0].id : '', qty:1}],
     discount:0,
+    deliveryDate: todayISO(),
     forceNew:null
+  };
+}
+
+function resetExpenseForm(){
+  expenseForm = {
+    description:'', amount:0, category:'otro', date: todayISO()
   };
 }
 
@@ -572,6 +608,7 @@ function render(){
   if(currentTab==='nuevo') body += renderNuevoPedido();
   else if(currentTab==='ruta') body += renderRuta();
   else if(currentTab==='ventas') body += renderVentas();
+  else if(currentTab==='gastos') body += renderGastos();
   else if(currentTab==='catalogo') body += renderCatalogo();
 
   root.innerHTML = `
@@ -587,6 +624,7 @@ function render(){
       ${navItem('nuevo','📝','Nuevo')}
       ${navItem('ruta','🚚','Ruta')}
       ${navItem('ventas','📊','Ventas')}
+      ${navItem('gastos','💸','Gastos')}
       ${navItem('catalogo','📦','Catálogo')}
     </div>
     ${paymentModalOrderId ? renderPaymentModal() : ''}
@@ -666,6 +704,13 @@ function renderNuevoPedido(){
       <label>Dirección</label>
       <input type="text" id="f-address" value="${escapeHtml(orderForm.address)}" placeholder="Calle, número, comuna">
 
+      <label>Fecha de entrega</label>
+      <div class="row-flex" style="align-items:center;">
+        <input type="date" id="f-date" value="${orderForm.deliveryDate}" style="flex:1.4;">
+        <button type="button" class="btn btn-outline btn-sm" id="date-today" style="flex:0.8;">Hoy</button>
+        <button type="button" class="btn btn-outline btn-sm" id="date-tomorrow" style="flex:0.8;">Mañana</button>
+      </div>
+
       <div class="client-status">
         <span class="badge ${clientNew?'badge-new':'badge-old'}">${clientNew?'Cliente nuevo':'Cliente antiguo'}</span>
         <button class="icon-btn" style="color:var(--text-muted); font-size:13px;" id="toggle-client-type">cambiar</button>
@@ -699,12 +744,24 @@ function renderNuevoPedido(){
 }
 
 function renderRuta(){
-  const pending = state.orders.filter(o=>o.status==='pending').sort((a,b)=>a.createdAt-b.createdAt);
+  const pending = state.orders.filter(o=>o.status==='pending' && (o.deliveryDate||todayISO())===routeDate).sort((a,b)=>a.createdAt-b.createdAt);
+  const isToday = routeDate===todayISO();
+  const dateNav = `
+    <div class="row-flex" style="margin-bottom:12px; align-items:center;">
+      <button type="button" class="btn btn-outline btn-sm" id="route-prev-day">◀</button>
+      <div style="flex:2; text-align:center; font-weight:600; color:var(--primary-dark); text-transform:capitalize;">${formatDateNice(routeDate)}</div>
+      <button type="button" class="btn btn-outline btn-sm" id="route-next-day">▶</button>
+    </div>
+    ${!isToday ? `<button type="button" class="btn btn-outline btn-sm" id="route-today" style="width:100%; margin-bottom:12px;">Volver a hoy</button>` : ''}
+  `;
   if(!pending.length){
-    return `<h2 class="section-title">🚚 Ruta del día</h2>
-      <div class="empty-state"><div class="paw">🐾</div>Aún no hay pedidos en ruta.<br>Agrega uno desde "Nuevo".</div>`;
+    return `<h2 class="section-title">🚚 Ruta ${isToday?'del día':''}</h2>
+      ${dateNav}
+      <div class="empty-state"><div class="paw">🐾</div>No hay pedidos programados para esta fecha.<br>Agrega uno desde "Nuevo".</div>`;
   }
-  return `<h2 class="section-title">🚚 Ruta del día <span style="font-size:13px; color:var(--text-muted); font-weight:500;">(${pending.length} pendiente${pending.length>1?'s':''})</span></h2>
+  return `<h2 class="section-title">🚚 Ruta ${isToday?'del día':''} <span style="font-size:13px; color:var(--text-muted); font-weight:500;">(${pending.length} pendiente${pending.length>1?'s':''})</span></h2>
+    ${dateNav}
+    <button type="button" class="btn btn-outline" style="width:100%; margin-bottom:14px;" id="download-manifest">🖼️ Descargar manifiesto de ruta (imagen)</button>
     ${pending.map(renderTicket).join('')}`;
 }
 
@@ -820,13 +877,75 @@ function renderVentas(){
       }).join(', ');
       const d = new Date(o.deliveredAt);
       const payOptsHtml = payMethods.map(k=>`<option value="${k}" ${o.paymentMethod===k?'selected':''}>${payLabel[k]}</option>`).join('');
+      const waThanks = `https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(`¡Hola ${o.clientName}! 🐾 Muchas gracias por tu compra en *Fast Pet*. Esperamos que tus mascotas disfruten su pedido. Cuando necesites reponer, no dudes en contactarnos. ¡Gracias por preferirnos! 💚`)}`;
       return `<div class="sale-row">
-        <div class="top"><span>${escapeHtml(o.clientName)}</span><span>${CURRENCY.format(total)}</span></div>
+        <div class="top">
+          <span>${escapeHtml(o.clientName)}</span>
+          <span>${CURRENCY.format(total)}</span>
+        </div>
         <div class="line">${items}</div>
         <div class="line">📍 ${escapeHtml(o.address)} · ${d.toLocaleDateString('es-CL')} ${d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</div>
-        <div class="line" style="margin-top:6px; display:flex; gap:6px; align-items:center;">
+        <div class="line" style="margin-top:6px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
           <select data-change-pay="${o.id}" style="width:auto; padding:4px 8px; font-size:11px; border-radius:20px; border:1.5px solid var(--border);">${payOptsHtml}</select>
           <span class="pill">${o.clientType==='nuevo'?'Nuevo':'Antiguo'}</span>
+          <a class="btn btn-whatsapp btn-sm" style="flex:0; padding:6px 10px; font-size:11px;" href="${waThanks}" target="_blank" rel="noopener">💬 Agradecer</a>
+        </div>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+function renderGastos(){
+  const catLabel = {combustible:'Combustible',mantencion:'Mantención',insumos:'Insumos',sueldos:'Sueldos',otro:'Otro'};
+  const sorted = [...state.expenses].sort((a,b)=>b.createdAt-a.createdAt);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayExp = sorted.filter(e=>e.createdAt >= today.getTime());
+  const todayTotal = todayExp.reduce((s,e)=>s+(e.amount||0),0);
+  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+  const monthExp = sorted.filter(e=>e.createdAt >= monthStart.getTime());
+  const monthTotal = monthExp.reduce((s,e)=>s+(e.amount||0),0);
+
+  return `
+    <h2 class="section-title">💸 Gastos</h2>
+    <div class="summary-bar">
+      <div class="summary-box">
+        <div class="lbl">Hoy</div>
+        <div class="val">${CURRENCY.format(todayTotal)}</div>
+      </div>
+      <div class="summary-box" style="background:var(--accent-dark);">
+        <div class="lbl">Este mes</div>
+        <div class="val">${CURRENCY.format(monthTotal)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label style="margin-top:0;">Descripción</label>
+      <input type="text" id="ex-description" value="${escapeHtml(expenseForm.description)}" placeholder="Ej: Bencina camioneta">
+
+      <div class="row-flex">
+        <div>
+          <label>Monto ($)</label>
+          <input type="number" min="0" step="1" id="ex-amount" value="${expenseForm.amount||0}" placeholder="0">
+        </div>
+        <div>
+          <label>Categoría</label>
+          <select id="ex-category">
+            ${Object.keys(catLabel).map(k=>`<option value="${k}" ${expenseForm.category===k?'selected':''}>${catLabel[k]}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="add-expense">+ Registrar gasto</button>
+    </div>
+
+    ${!sorted.length ? `<div class="empty-state"><div class="paw">💸</div>Todavía no hay gastos registrados.</div>` : sorted.map(e=>{
+      const d = new Date(e.createdAt);
+      return `<div class="sale-row">
+        <div class="top"><span>${escapeHtml(e.description)}</span><span>${CURRENCY.format(e.amount||0)}</span></div>
+        <div class="line">${d.toLocaleDateString('es-CL')} ${d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</div>
+        <div class="line" style="margin-top:6px; display:flex; gap:6px; align-items:center;">
+          <span class="pill">${catLabel[e.category]||e.category}</span>
+          <button class="icon-btn" data-delete-expense="${e.id}" style="margin-left:auto;">✕</button>
         </div>
       </div>`;
     }).join('')}
@@ -879,7 +998,14 @@ function attachHandlers(){
     const phoneEl = document.getElementById('f-phone');
     if(phoneEl){
       phoneEl.oninput = e=>{ orderForm.phone = e.target.value; orderForm.forceNew=null; };
-      phoneEl.onblur = ()=>{ render(); };
+      phoneEl.onblur = ()=>{
+        const match = findClientByPhone(orderForm.phone);
+        if(match){
+          if(!orderForm.clientName.trim()) orderForm.clientName = match.name;
+          if(!orderForm.address.trim()) orderForm.address = match.address;
+        }
+        render();
+      };
     }
     const addrEl = document.getElementById('f-address');
     if(addrEl) addrEl.oninput = e=>{ orderForm.address = e.target.value; };
@@ -890,6 +1016,12 @@ function attachHandlers(){
       discEl.oninput = e=>{ orderForm.discount = Math.max(0, parseInt(e.target.value)||0); };
       discEl.onblur = ()=>{ render(); };
     }
+    const dateEl = document.getElementById('f-date');
+    if(dateEl) dateEl.onchange = e=>{ orderForm.deliveryDate = e.target.value || todayISO(); render(); };
+    const dateTodayBtn = document.getElementById('date-today');
+    if(dateTodayBtn) dateTodayBtn.onclick = ()=>{ orderForm.deliveryDate = todayISO(); render(); };
+    const dateTomorrowBtn = document.getElementById('date-tomorrow');
+    if(dateTomorrowBtn) dateTomorrowBtn.onclick = ()=>{ orderForm.deliveryDate = addDaysISO(todayISO(),1); render(); };
 
     const toggleBtn = document.getElementById('toggle-client-type');
     if(toggleBtn) toggleBtn.onclick = ()=>{ orderForm.forceNew = !isNewClient(); render(); };
@@ -931,6 +1063,14 @@ function attachHandlers(){
         }
       };
     });
+    const prevBtn = document.getElementById('route-prev-day');
+    if(prevBtn) prevBtn.onclick = ()=>{ routeDate = addDaysISO(routeDate,-1); render(); };
+    const nextBtn = document.getElementById('route-next-day');
+    if(nextBtn) nextBtn.onclick = ()=>{ routeDate = addDaysISO(routeDate,1); render(); };
+    const todayBtn = document.getElementById('route-today');
+    if(todayBtn) todayBtn.onclick = ()=>{ routeDate = todayISO(); render(); };
+    const manifestBtn = document.getElementById('download-manifest');
+    if(manifestBtn) manifestBtn.onclick = downloadManifest;
   }
 
   if(paymentModalOrderId){
@@ -981,6 +1121,41 @@ function attachHandlers(){
       showToast('Catálogo guardado ✅');
     };
   }
+
+  if(currentTab==='gastos'){
+    const descEl = document.getElementById('ex-description');
+    if(descEl) descEl.oninput = e=>{ expenseForm.description = e.target.value; };
+    const amtEl = document.getElementById('ex-amount');
+    if(amtEl) amtEl.oninput = e=>{ expenseForm.amount = Math.max(0, parseInt(e.target.value)||0); };
+    const catEl = document.getElementById('ex-category');
+    if(catEl) catEl.onchange = e=>{ expenseForm.category = e.target.value; };
+    const addExpBtn = document.getElementById('add-expense');
+    if(addExpBtn) addExpBtn.onclick = async ()=>{
+      if(!expenseForm.description.trim()){ showToast('Falta la descripción del gasto'); return; }
+      if(!expenseForm.amount || expenseForm.amount<=0){ showToast('Ingresa un monto válido'); return; }
+      state.expenses.push({
+        id: uid('e'),
+        description: expenseForm.description.trim(),
+        amount: expenseForm.amount,
+        category: expenseForm.category,
+        createdAt: Date.now()
+      });
+      await saveExpenses();
+      resetExpenseForm();
+      render();
+      showToast('Gasto registrado 💸');
+    };
+    document.querySelectorAll('[data-delete-expense]').forEach(el=>{
+      el.onclick = async ()=>{
+        if(confirm('¿Eliminar este gasto?')){
+          state.expenses = state.expenses.filter(e=>e.id!==el.dataset.deleteExpense);
+          await saveExpenses();
+          render();
+          showToast('Gasto eliminado 🗑️');
+        }
+      };
+    });
+  }
 }
 
 async function handleSubmitOrder(){
@@ -997,6 +1172,7 @@ async function handleSubmitOrder(){
     horario: orderForm.horario.trim(),
     items: orderForm.items.filter(it=>it.productId),
     discount: Math.max(0, orderForm.discount||0),
+    deliveryDate: orderForm.deliveryDate || todayISO(),
     clientType,
     status: 'pending',
     createdAt: Date.now(),
@@ -1011,10 +1187,11 @@ async function handleSubmitOrder(){
     await saveClients();
   }
 
+  routeDate = order.deliveryDate;
   resetOrderForm();
   currentTab = 'ruta';
   render();
-  showToast('Pedido agregado a la ruta 🚚');
+  showToast(order.deliveryDate===todayISO() ? 'Pedido agregado a la ruta 🚚' : `Pedido agendado para ${formatDateNice(order.deliveryDate)} 📅`);
 }
 
 async function deleteOrder(id){
@@ -1063,6 +1240,105 @@ function exportCsv(){
   a.download = `fastpet_ventas_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function downloadManifest(){
+  const pending = state.orders.filter(o=>o.status==='pending' && (o.deliveryDate||todayISO())===routeDate).sort((a,b)=>a.createdAt-b.createdAt);
+  if(!pending.length){ showToast('No hay pedidos para generar el manifiesto'); return; }
+
+  const W = 900;
+  const rowH = 130;
+  const headerH = 130;
+  const H = headerH + pending.length*rowH + 40;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#FAF7F1';
+  ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = '#1F4B43';
+  ctx.fillRect(0,0,W,90);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 30px sans-serif';
+  ctx.fillText('🐾 Fast Pet — Manifiesto de ruta', 24, 46);
+  ctx.font = '16px sans-serif';
+  ctx.fillStyle = '#CFE3DC';
+  ctx.fillText(formatDateNice(routeDate) + '  ·  ' + pending.length + ' pedido' + (pending.length>1?'s':''), 24, 74);
+
+  let y = headerH;
+  pending.forEach((o, idx)=>{
+    const total = orderNetTotal(o);
+    const items = o.items.map(it=>{
+      const p = state.products.find(pp=>pp.id===it.productId);
+      return `${it.qty}x ${p?p.name:'-'}`;
+    }).join(', ');
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#E4DFD3';
+    ctx.lineWidth = 1;
+    roundRect(ctx, 20, y, W-40, rowH-14, 12);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#FF8A3D';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText('#'+(idx+1), 36, y+34);
+
+    ctx.fillStyle = '#153731';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillText(o.clientName, 80, y+34);
+
+    ctx.font = '16px sans-serif';
+    ctx.fillStyle = '#26302C';
+    ctx.fillText('📍 ' + o.address, 36, y+62);
+    ctx.fillText('📞 ' + o.phone + (o.horario ? ('   ⏰ ' + o.horario) : ''), 36, y+86);
+
+    ctx.fillStyle = '#6B7770';
+    ctx.font = '14px sans-serif';
+    wrapText(ctx, items, 36, y+108, W-100, 18);
+
+    ctx.fillStyle = '#153731';
+    ctx.font = 'bold 18px monospace';
+    const totalText = CURRENCY.format(total);
+    const tw = ctx.measureText(totalText).width;
+    ctx.fillText(totalText, W-40-tw, y+34);
+
+    y += rowH;
+  });
+
+  const link = document.createElement('a');
+  link.download = `fastpet_manifiesto_${routeDate}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  showToast('Manifiesto descargado 🖼️');
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight){
+  const words = text.split(' ');
+  let line = '';
+  let curY = y;
+  for(let i=0;i<words.length;i++){
+    const testLine = line + words[i] + ' ';
+    if(ctx.measureText(testLine).width > maxWidth && line){
+      ctx.fillText(line, x, curY);
+      line = words[i] + ' ';
+      curY += lineHeight;
+    } else {
+      line = testLine;
+    }
+  }
+  ctx.fillText(line, x, curY);
 }
 
 loadState();
