@@ -576,7 +576,7 @@ function showToast(msg){
 
 function resetOrderForm(){
   orderForm = {
-    clientName:'', phone:'', address:'', horario:'',
+    clientName:'', phone:'', address:'', comuna:'', horario:'',
     items:[{productId: state.products[0] ? state.products[0].id : '', qty:1}],
     discount:0,
     deliveryDate: todayISO(),
@@ -721,6 +721,8 @@ function renderNuevoPedido(){
   const discount = Math.min(orderForm.discount||0, subtotal);
   const total = Math.max(0, subtotal - discount);
   const clientList = state.clients.map(c=>`<option value="${c.name}">`).join('');
+  const comunaSet = Array.from(new Set(state.clients.map(c=>c.comuna).filter(c=>c && c.trim())));
+  const comunaListHtml = comunaSet.map(c=>`<option value="${escapeHtml(c)}">`).join('');
 
   return `
     <h2 class="section-title">📝 Nuevo pedido</h2>
@@ -741,7 +743,11 @@ function renderNuevoPedido(){
       </div>
 
       <label>Dirección</label>
-      <input type="text" id="f-address" value="${escapeHtml(orderForm.address)}" placeholder="Calle, número, comuna">
+      <input type="text" id="f-address" value="${escapeHtml(orderForm.address)}" placeholder="Calle y número">
+
+      <label>Comuna</label>
+      <input type="text" id="f-comuna" list="comuna-list" value="${escapeHtml(orderForm.comuna)}" placeholder="Ej: Peñalolén">
+      <datalist id="comuna-list">${comunaListHtml}</datalist>
 
       <label>Fecha de entrega</label>
       <div class="row-flex" style="align-items:center;">
@@ -782,8 +788,21 @@ function renderNuevoPedido(){
   `;
 }
 
+function comunaLabelOf(o){
+  return (o.comuna && o.comuna.trim()) ? o.comuna.trim() : 'Sin comuna';
+}
+
+function sortByComuna(list){
+  return [...list].sort((a,b)=>{
+    const ca = comunaLabelOf(a).toLowerCase();
+    const cb = comunaLabelOf(b).toLowerCase();
+    if(ca!==cb) return ca.localeCompare(cb,'es');
+    return a.createdAt-b.createdAt;
+  });
+}
+
 function renderRuta(){
-  const pending = state.orders.filter(o=>o.status==='pending' && (o.deliveryDate||todayISO())===routeDate).sort((a,b)=>a.createdAt-b.createdAt);
+  const pending = sortByComuna(state.orders.filter(o=>o.status==='pending' && (o.deliveryDate||todayISO())===routeDate));
   const isToday = routeDate===todayISO();
   const dateNav = `
     <div class="row-flex" style="margin-bottom:12px; align-items:center;">
@@ -798,10 +817,20 @@ function renderRuta(){
       ${dateNav}
       <div class="empty-state"><div class="paw">🐾</div>No hay pedidos programados para esta fecha.<br>Agrega uno desde "Nuevo".</div>`;
   }
+  let lastComuna = null;
+  const ticketsHtml = pending.map(o=>{
+    const label = comunaLabelOf(o);
+    let header = '';
+    if(label !== lastComuna){
+      lastComuna = label;
+      header = `<div style="font-family:'Baloo 2',sans-serif; font-weight:700; font-size:14px; color:var(--primary); margin:18px 0 8px; display:flex; align-items:center; gap:6px;">📍 ${escapeHtml(label)}</div>`;
+    }
+    return header + renderTicket(o);
+  }).join('');
   return `<h2 class="section-title">🚚 Ruta ${isToday?'del día':''} <span style="font-size:13px; color:var(--text-muted); font-weight:500;">(${pending.length} pendiente${pending.length>1?'s':''})</span></h2>
     ${dateNav}
     <button type="button" class="btn btn-outline" style="width:100%; margin-bottom:14px;" id="download-manifest">🖼️ Descargar manifiesto de ruta (imagen)</button>
-    ${pending.map(renderTicket).join('')}`;
+    ${ticketsHtml}`;
 }
 
 function renderTicket(o){
@@ -822,7 +851,7 @@ function renderTicket(o){
           <span class="badge ${o.clientType==='nuevo'?'badge-new':'badge-old'}">${o.clientType==='nuevo'?'Nuevo':'Antiguo'}</span>
         </div>
         <div class="ticket-meta">
-          📍 <b>${escapeHtml(o.address)}</b><br>
+          📍 <b>${escapeHtml(o.address)}</b>${o.comuna ? ', ' + escapeHtml(o.comuna) : ''}<br>
           📞 ${escapeHtml(o.phone)} &nbsp;·&nbsp; ⏰ ${escapeHtml(o.horario||'sin horario')}
         </div>
       </div>
@@ -1090,12 +1119,15 @@ function attachHandlers(){
         if(match){
           if(!orderForm.clientName.trim()) orderForm.clientName = match.name;
           if(!orderForm.address.trim()) orderForm.address = match.address;
+          if(!orderForm.comuna.trim()) orderForm.comuna = match.comuna || '';
         }
         render();
       };
     }
     const addrEl = document.getElementById('f-address');
     if(addrEl) addrEl.oninput = e=>{ orderForm.address = e.target.value; };
+    const comunaEl = document.getElementById('f-comuna');
+    if(comunaEl) comunaEl.oninput = e=>{ orderForm.comuna = e.target.value; };
     const horEl = document.getElementById('f-horario');
     if(horEl) horEl.oninput = e=>{ orderForm.horario = e.target.value; };
     const discEl = document.getElementById('f-discount');
@@ -1265,6 +1297,7 @@ async function handleSubmitOrder(){
     clientName: orderForm.clientName.trim(),
     phone: orderForm.phone.trim(),
     address: orderForm.address.trim(),
+    comuna: orderForm.comuna.trim(),
     horario: orderForm.horario.trim(),
     items: orderForm.items.filter(it=>it.productId),
     discount: Math.max(0, orderForm.discount||0),
@@ -1278,8 +1311,12 @@ async function handleSubmitOrder(){
   state.orders.push(order);
   await saveOrders();
 
-  if(!findClientByPhone(order.phone)){
-    state.clients.push({name:order.clientName, phone:order.phone, address:order.address});
+  const existingClient = findClientByPhone(order.phone);
+  if(!existingClient){
+    state.clients.push({name:order.clientName, phone:order.phone, address:order.address, comuna:order.comuna});
+    await saveClients();
+  }else if(order.comuna && !existingClient.comuna){
+    existingClient.comuna = order.comuna;
     await saveClients();
   }
 
@@ -1313,7 +1350,7 @@ async function confirmDelivery(method){
 function exportCsv(list){
   const delivered = [...(list || state.orders.filter(o=>o.status==='delivered'))].sort((a,b)=>a.deliveredAt-b.deliveredAt);
   const payLabel = {efectivo:'Efectivo',tarjeta:'Tarjeta',transferencia:'Transferencia',credito:'Crédito',pendiente:'Pendiente'};
-  const rows = [['Fecha','Hora','Cliente','Telefono','Direccion','Productos','Descuento','Total','MedioPago','TipoCliente','Horario']];
+  const rows = [['Fecha','Hora','Cliente','Telefono','Direccion','Comuna','Productos','Descuento','Total','MedioPago','TipoCliente','Horario']];
   delivered.forEach(o=>{
     const d = new Date(o.deliveredAt);
     const items = o.items.map(it=>{
@@ -1323,7 +1360,7 @@ function exportCsv(list){
     rows.push([
       d.toLocaleDateString('es-CL'),
       d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}),
-      o.clientName, o.phone, o.address, items,
+      o.clientName, o.phone, o.address, o.comuna||'', items,
       o.discount||0, orderNetTotal(o), payLabel[o.paymentMethod]||o.paymentMethod,
       o.clientType, o.horario||''
     ]);
@@ -1339,13 +1376,22 @@ function exportCsv(list){
 }
 
 function downloadManifest(){
-  const pending = state.orders.filter(o=>o.status==='pending' && (o.deliveryDate||todayISO())===routeDate).sort((a,b)=>a.createdAt-b.createdAt);
+  const pending = sortByComuna(state.orders.filter(o=>o.status==='pending' && (o.deliveryDate||todayISO())===routeDate));
   if(!pending.length){ showToast('No hay pedidos para generar el manifiesto'); return; }
 
   const W = 900;
   const rowH = 130;
   const headerH = 130;
-  const H = headerH + pending.length*rowH + 40;
+  const groupHeaderH = 50;
+
+  let groupsCount = 0;
+  let prevComunaCount = null;
+  pending.forEach(o=>{
+    const c = comunaLabelOf(o);
+    if(c !== prevComunaCount){ groupsCount++; prevComunaCount = c; }
+  });
+
+  const H = headerH + groupsCount*groupHeaderH + pending.length*rowH + 40;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -1363,7 +1409,20 @@ function downloadManifest(){
   ctx.fillText(formatDateNice(routeDate) + '  ·  ' + pending.length + ' pedido' + (pending.length>1?'s':''), 24, 74);
 
   let y = headerH;
+  let lastComuna = null;
   pending.forEach((o, idx)=>{
+    const comunaLabel = comunaLabelOf(o);
+    if(comunaLabel !== lastComuna){
+      lastComuna = comunaLabel;
+      ctx.fillStyle = '#E8E2D4';
+      roundRect(ctx, 20, y, W-40, groupHeaderH-12, 10);
+      ctx.fill();
+      ctx.fillStyle = '#153731';
+      ctx.font = 'bold 19px sans-serif';
+      ctx.fillText('📍 ' + comunaLabel, 34, y+27);
+      y += groupHeaderH;
+    }
+
     const total = orderNetTotal(o);
     const items = o.items.map(it=>{
       const p = state.products.find(pp=>pp.id===it.productId);
