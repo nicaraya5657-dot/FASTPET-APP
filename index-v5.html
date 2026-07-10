@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fast Pet · Gestión de Pedidos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF7F1;
+    --primary:#1F4B43;
+    --primary-light:#2F6358;
+    --primary-dark:#153731;
+    --accent:#FF8A3D;
+    --accent-dark:#E86F1F;
+    --success:#3F9142;
+    --danger:#D64545;
+    --text:#26302C;
+    --text-muted:#6B7770;
+    --card-bg:#FFFFFF;
+    --border:#E4DFD3;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  #root{
+    font-family:'Inter',sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    padding-bottom:78px;
+  }
+  .header{
+    background:var(--primary);
+    color:#fff;
+    padding:18px 20px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    position:sticky;
+    top:0;
+    z-index:20;
+    box-shadow:0 2px 10px rgba(0,0,0,0.08);
+  }
+  .header .brand{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:800;
+    font-size:22px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    letter-spacing:0.2px;
+  }
+  .header .date{
+    font-size:12px;
+    color:#CFE3DC;
+    font-weight:500;
+    text-align:right;
+  }
+  main{
+    flex:1;
+    max-width:640px;
+    width:100%;
+    margin:0 auto;
+    padding:18px 16px 12px;
+  }
+  h2.section-title{
+    font-family:'Baloo 2',sans-serif;
+    font-size:19px;
+    font-weight:700;
+    color:var(--primary-dark);
+    margin:4px 0 14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .card{
+    background:var(--card-bg);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px;
+    margin-bottom:14px;
+  }
+  label{
+    display:block;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--text-muted);
+    margin:12px 0 5px;
+  }
+  label:first-child{margin-top:0;}
+  input[type=text], input[type=tel], input[type=number], select{
+    width:100%;
+    padding:11px 12px;
+    border:1.5px solid var(--border);
+    border-radius:10px;
+    font-size:15px;
+    font-family:'Inter',sans-serif;
+    background:#fff;
+    color:var(--text);
+  }
+  input:focus, select:focus{
+    outline:none;
+    border-color:var(--primary-light);
+  }
+  .row-flex{display:flex; gap:8px;}
+  .row-flex > div{flex:1;}
+  .badge{
+    display:inline-block;
+    font-size:11px;
+    font-weight:700;
+    padding:3px 9px;
+    border-radius:20px;
+    letter-spacing:0.3px;
+  }
+  .badge-new{background:#FFE9D6; color:var(--accent-dark);}
+  .badge-old{background:#DCEEE6; color:var(--primary);}
+  .client-status{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:12px;
+    font-size:13px;
+    color:var(--text-muted);
+  }
+  .product-row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-bottom:8px;
+  }
+  .product-row select{flex:2.4;}
+  .product-row input{flex:0.9; text-align:center;}
+  .icon-btn{
+    background:none;
+    border:none;
+    color:var(--danger);
+    font-size:18px;
+    cursor:pointer;
+    padding:6px 8px;
+    line-height:1;
+  }
+  .add-row-btn{
+    background:none;
+    border:1.5px dashed var(--border);
+    color:var(--primary);
+    font-weight:600;
+    font-size:13.5px;
+    padding:9px;
+    border-radius:10px;
+    width:100%;
+    cursor:pointer;
+    margin-top:2px;
+  }
+  .add-row-btn:hover{border-color:var(--primary-light);}
+  .order-total{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1.5px dashed var(--border);
+    font-family:'JetBrains Mono',monospace;
+  }
+  .order-total .amt{font-size:20px; font-weight:700; color:var(--primary-dark);}
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    border:none;
+    border-radius:10px;
+    font-weight:700;
+    font-size:14px;
+    padding:12px 16px;
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+    transition:transform 0.05s ease;
+  }
+  .btn:active{transform:scale(0.98);}
+  .btn-primary{background:var(--accent); color:#fff; width:100%; margin-top:16px; font-size:15px; padding:13px;}
+  .btn-primary:hover{background:var(--accent-dark);}
+  .btn-outline{background:#fff; border:1.5px solid var(--border); color:var(--text);}
+  .btn-success{background:var(--success); color:#fff;}
+  .btn-whatsapp{background:#25D366; color:#fff;}
+  .btn-sm{font-size:12.5px; padding:9px 10px; flex:1;}
+
+  /* Ticket card for route */
+  .ticket{
+    background:var(--card-bg);
+    border-radius:var(--radius);
+    border:1px solid var(--border);
+    margin-bottom:16px;
+    position:relative;
+    overflow:hidden;
+    box-shadow:0 1px 4px rgba(38,48,44,0.05);
+  }
+  .ticket.delivered{opacity:0.72;}
+  .ticket-top{padding:14px 16px 12px;}
+  .ticket-client{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+  }
+  .ticket-client .name{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:700;
+    font-size:17px;
+    color:var(--primary-dark);
+  }
+  .ticket-meta{
+    margin-top:8px;
+    font-size:13px;
+    color:var(--text-muted);
+    line-height:1.6;
+  }
+  .ticket-meta b{color:var(--text);}
+  .ticket-divider{
+    height:0;
+    border-top:2px dashed var(--border);
+    margin:0 16px;
+    position:relative;
+  }
+  .ticket-divider::before, .ticket-divider::after{
+    content:'';
+    position:absolute;
+    top:-8px;
+    width:16px;
+    height:16px;
+    background:var(--bg);
+    border-radius:50%;
+  }
+  .ticket-divider::before{left:-24px;}
+  .ticket-divider::after{right:-24px;}
+  .ticket-products{
+    padding:12px 16px;
+    font-size:13.5px;
+  }
+  .prod-line{
+    display:flex;
+    justify-content:space-between;
+    padding:2px 0;
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+  }
+  .ticket-total{
+    display:flex;
+    justify-content:space-between;
+    font-weight:700;
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px solid var(--border);
+    color:var(--primary-dark);
+    font-family:'JetBrains Mono',monospace;
+  }
+  .ticket-actions{
+    display:flex;
+    gap:8px;
+    padding:12px 16px 16px;
+  }
+  .stamp{
+    position:absolute;
+    top:10px;
+    right:14px;
+    border:2.5px solid var(--success);
+    color:var(--success);
+    font-family:'Baloo 2',sans-serif;
+    font-weight:800;
+    font-size:11px;
+    padding:3px 8px;
+    border-radius:6px;
+    transform:rotate(9deg);
+    letter-spacing:1px;
+    opacity:0.85;
+  }
+  .empty-state{
+    text-align:center;
+    padding:40px 20px;
+    color:var(--text-muted);
+  }
+  .empty-state .paw{font-size:32px; margin-bottom:8px;}
+
+  /* Bottom nav */
+  .bottom-nav{
+    position:fixed;
+    bottom:0; left:0; right:0;
+    background:#fff;
+    border-top:1px solid var(--border);
+    display:flex;
+    z-index:30;
+    box-shadow:0 -2px 10px rgba(0,0,0,0.05);
+  }
+  .nav-item{
+    flex:1;
+    text-align:center;
+    padding:9px 4px 10px;
+    background:none;
+    border:none;
+    cursor:pointer;
+    color:var(--text-muted);
+    font-family:'Inter',sans-serif;
+  }
+  .nav-item .ic{font-size:20px; display:block;}
+  .nav-item .lb{font-size:10.5px; font-weight:600; margin-top:2px; display:block;}
+  .nav-item.active{color:var(--primary);}
+  .nav-item.active .ic{transform:scale(1.08);}
+
+  /* Modal */
+  .modal-backdrop{
+    position:fixed; inset:0;
+    background:rgba(31,75,67,0.45);
+    display:flex; align-items:flex-end;
+    justify-content:center;
+    z-index:50;
+  }
+  .modal{
+    background:#fff;
+    width:100%; max-width:480px;
+    border-radius:18px 18px 0 0;
+    padding:20px 20px 28px;
+  }
+  .modal h3{
+    font-family:'Baloo 2',sans-serif;
+    margin:0 0 4px;
+    color:var(--primary-dark);
+  }
+  .modal p{margin:0 0 16px; color:var(--text-muted); font-size:13.5px;}
+  .pay-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .pay-opt{
+    border:1.5px solid var(--border);
+    background:#fff;
+    border-radius:12px;
+    padding:14px 10px;
+    text-align:center;
+    cursor:pointer;
+    font-weight:600;
+    font-size:13.5px;
+  }
+  .pay-opt:hover{border-color:var(--accent);}
+  .pay-opt .em{font-size:20px; display:block; margin-bottom:4px;}
+  .modal-cancel{
+    width:100%; margin-top:14px;
+    background:none; border:none;
+    color:var(--text-muted);
+    font-weight:600;
+    padding:10px;
+    cursor:pointer;
+  }
+
+  /* Sales table */
+  .sale-row{
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:12px 14px;
+    margin-bottom:10px;
+    font-size:13px;
+  }
+  .sale-row .top{display:flex; justify-content:space-between; font-weight:700; color:var(--primary-dark); font-family:'Baloo 2',sans-serif; font-size:15px;}
+  .sale-row .line{color:var(--text-muted); margin-top:4px;}
+  .pill{
+    font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px;
+    background:#EFEAE0; color:var(--text-muted); display:inline-block;
+  }
+  .summary-bar{
+    display:flex; gap:10px; margin-bottom:16px;
+  }
+  .summary-box{
+    flex:1;
+    background:var(--primary);
+    color:#fff;
+    border-radius:12px;
+    padding:12px 14px;
+  }
+  .summary-box .lbl{font-size:11px; opacity:0.8;}
+  .summary-box .val{font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; margin-top:2px;}
+
+  .catalog-row{
+    display:flex; gap:8px; align-items:center; margin-bottom:8px;
+  }
+  .catalog-row input{flex:1;}
+  .catalog-row input.price{flex:0.6; text-align:right;}
+  .toast{
+    position:fixed;
+    bottom:90px; left:50%;
+    transform:translateX(-50%);
+    background:var(--primary-dark);
+    color:#fff;
+    padding:11px 20px;
+    border-radius:30px;
+    font-size:13.5px;
+    font-weight:600;
+    z-index:60;
+    box-shadow:0 4px 14px rgba(0,0,0,0.2);
+  }
+  ::placeholder{color:#B7B0A2;}
+  @media (max-width:360px){
+    .pay-grid{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+const CURRENCY = new Intl.NumberFormat('es-CL', {style:'currency', currency:'CLP', maximumFractionDigits:0});
+
+let state = {
+  products: [],
+  clients: [],
+  orders: [],
+  expenses: [],
+  loaded: false
+};
+let currentTab = 'nuevo';
+let orderForm = null; // draft order
+let expenseForm = null; // draft expense
+let paymentModalOrderId = null;
+let toastMsg = null;
+let toastTimer = null;
+let apiUrl = localStorage.getItem('fastpet_api_url') || '';
+let apiError = false;
+let routeDate = todayISO();
+let ventasMonth = currentMonthISO();
+
+function todayISO(){
+  const d = new Date();
+  const tz = d.getTimezoneOffset()*60000;
+  return new Date(d - tz).toISOString().slice(0,10);
+}
+
+function addDaysISO(iso, days){
+  const d = new Date(iso+'T00:00:00');
+  d.setDate(d.getDate()+days);
+  const tz = d.getTimezoneOffset()*60000;
+  return new Date(d - tz).toISOString().slice(0,10);
+}
+
+function formatDateNice(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long'});
+}
+
+function currentMonthISO(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function monthFromTimestamp(ts){
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function addMonthsISO(iso, delta){
+  const [y,m] = iso.split('-').map(Number);
+  const d = new Date(y, m-1+delta, 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function monthLabelNice(iso){
+  const [y,m] = iso.split('-').map(Number);
+  const d = new Date(y, m-1, 1);
+  const s = d.toLocaleDateString('es-CL', {month:'long', year:'numeric'});
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function uid(prefix){
+  return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+}
+
+function normPhone(p){
+  return (p||'').replace(/[^0-9]/g,'');
+}
+
+function waPhone(p){
+  let d = normPhone(p);
+  if(d.startsWith('56')) return d;
+  if(d.startsWith('9') && d.length===9) return '56'+d;
+  if(d.length===8) return '569'+d;
+  return d;
+}
+
+function todayStr(){
+  return new Date().toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long'});
+}
+
+async function apiGet(key){
+  const res = await fetch(`${apiUrl}?key=${encodeURIComponent(key)}`);
+  if(!res.ok) throw new Error('API error '+res.status);
+  const data = await res.json();
+  return data.value;
+}
+async function apiSet(key, value){
+  const res = await fetch(apiUrl, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({key, value})
+  });
+  if(!res.ok) throw new Error('API error '+res.status);
+}
+
+async function loadState(){
+  if(!apiUrl){ state.loaded='config'; render(); return; }
+  apiError = false;
+  try{
+    const p = await apiGet('products');
+    state.products = p ? JSON.parse(p) : defaultProducts();
+  }catch(e){ apiError = true; state.products = defaultProducts(); }
+  try{
+    const c = await apiGet('clients');
+    state.clients = c ? JSON.parse(c) : [];
+  }catch(e){ apiError = true; state.clients = []; }
+  try{
+    const o = await apiGet('orders');
+    state.orders = o ? JSON.parse(o) : [];
+  }catch(e){ apiError = true; state.orders = []; }
+  try{
+    const ex = await apiGet('expenses');
+    state.expenses = ex ? JSON.parse(ex) : [];
+  }catch(e){ apiError = true; state.expenses = []; }
+  if(!apiError && !state.products.length){
+    state.products = defaultProducts();
+    await saveProducts();
+  }
+  state.loaded = true;
+  resetOrderForm();
+  resetExpenseForm();
+  render();
+}
+
+function defaultProducts(){
+  return [
+    {id:uid('p'), brand:'Nómade', name:'Nómade 15kg', price:28000, cost:0},
+    {id:uid('p'), brand:'Bokato Gold', name:'Bokato Gold 15kg', price:26000, cost:0},
+    {id:uid('p'), brand:'Master Dog', name:'Master Dog 21kg', price:24000, cost:0},
+    {id:uid('p'), brand:'Fit Fórmula', name:'Fit Fórmula 15kg', price:22000, cost:0},
+    {id:uid('p'), brand:'Arena Easy Clean', name:'Arena Easy Clean 10kg', price:9000, cost:0},
+  ];
+}
+
+async function saveProducts(){
+  try{ await apiSet('products', JSON.stringify(state.products)); }catch(e){ showToast('⚠️ No se pudo guardar (revisa conexión)'); }
+}
+async function saveClients(){
+  try{ await apiSet('clients', JSON.stringify(state.clients)); }catch(e){ showToast('⚠️ No se pudo guardar (revisa conexión)'); }
+}
+async function saveOrders(){
+  try{ await apiSet('orders', JSON.stringify(state.orders)); }catch(e){ showToast('⚠️ No se pudo guardar (revisa conexión)'); }
+}
+async function saveExpenses(){
+  try{ await apiSet('expenses', JSON.stringify(state.expenses)); }catch(e){ showToast('⚠️ No se pudo guardar (revisa conexión)'); }
+}
+
+function saveApiUrlAndStart(url){
+  apiUrl = url.trim();
+  localStorage.setItem('fastpet_api_url', apiUrl);
+  state.loaded = false;
+  render();
+  loadState();
+}
+
+function showToast(msg){
+  toastMsg = msg;
+  render();
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ toastMsg=null; render(); }, 2200);
+}
+
+function resetOrderForm(){
+  orderForm = {
+    clientName:'', phone:'', address:'', comuna:'', horario:'',
+    items:[{productId: state.products[0] ? state.products[0].id : '', qty:1}],
+    discount:0,
+    deliveryDate: todayISO(),
+    forceNew:null
+  };
+}
+
+function resetExpenseForm(){
+  expenseForm = {
+    description:'', amount:0, category:'otro', date: todayISO()
+  };
+}
+
+function findClientByPhone(phone){
+  const d = normPhone(phone);
+  if(!d) return null;
+  return state.clients.find(c => normPhone(c.phone) === d) || null;
+}
+
+function isNewClient(){
+  if(orderForm.forceNew !== null) return orderForm.forceNew;
+  if(!orderForm.phone) return true;
+  return !findClientByPhone(orderForm.phone);
+}
+
+function orderItemsTotal(items){
+  return items.reduce((sum,it)=>{
+    const prod = state.products.find(p=>p.id===it.productId);
+    return sum + (prod ? prod.price * (it.qty||0) : 0);
+  },0);
+}
+
+function orderNetTotal(o){
+  const subtotal = orderItemsTotal(o.items);
+  const discount = Math.min(o.discount||0, subtotal);
+  return Math.max(0, subtotal - discount);
+}
+
+function orderItemsCost(items){
+  return items.reduce((sum,it)=>{
+    const prod = state.products.find(p=>p.id===it.productId);
+    return sum + (prod ? (prod.cost||0) * (it.qty||0) : 0);
+  },0);
+}
+
+function orderUtilidad(o){
+  return orderNetTotal(o) - orderItemsCost(o.items);
+}
+
+function orderSacos(o){
+  return o.items.reduce((s,it)=>s+(it.qty||0),0);
+}
+
+// ---------- Rendering ----------
+function render(){
+  const root = document.getElementById('root');
+  if(state.loaded==='config'){
+    root.innerHTML = renderConfigScreen();
+    attachConfigHandlers();
+    return;
+  }
+  if(!state.loaded){
+    root.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:Inter,sans-serif;color:#6B7770;">Cargando Fast Pet…</div>`;
+    return;
+  }
+  let body = '';
+  if(apiError) body += `<div style="background:#FCEAEA; border:1px solid #F0B8B8; color:#B03A3A; padding:10px 14px; border-radius:10px; font-size:13px; margin-bottom:14px;">⚠️ No se pudo conectar con tu hoja de Google. Revisa tu conexión a internet o que la URL configurada siga siendo válida.</div>`;
+  if(currentTab==='nuevo') body += renderNuevoPedido();
+  else if(currentTab==='ruta') body += renderRuta();
+  else if(currentTab==='ventas') body += renderVentas();
+  else if(currentTab==='gastos') body += renderGastos();
+  else if(currentTab==='catalogo') body += renderCatalogo();
+
+  root.innerHTML = `
+    <div class="header">
+      <div class="brand">🐾 Fast Pet</div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="date">${todayStr()}</div>
+        <button id="settings-btn" style="background:none;border:none;color:#fff;opacity:0.8;font-size:16px;cursor:pointer;">⚙️</button>
+      </div>
+    </div>
+    <main>${body}</main>
+    <div class="bottom-nav">
+      ${navItem('nuevo','📝','Nuevo')}
+      ${navItem('ruta','🚚','Ruta')}
+      ${navItem('ventas','📊','Ventas')}
+      ${navItem('gastos','💸','Gastos')}
+      ${navItem('catalogo','📦','Catálogo')}
+    </div>
+    ${paymentModalOrderId ? renderPaymentModal() : ''}
+    ${toastMsg ? `<div class="toast">${toastMsg}</div>` : ''}
+  `;
+  attachHandlers();
+}
+
+function renderConfigScreen(){
+  return `
+    <div style="max-width:440px;margin:0 auto;padding:60px 20px; font-family:'Inter',sans-serif;">
+      <div style="text-align:center; margin-bottom:24px;">
+        <div style="font-size:36px;">🐾</div>
+        <div style="font-family:'Baloo 2',sans-serif; font-weight:800; font-size:22px; color:#1F4B43; margin-top:6px;">Configura Fast Pet</div>
+        <div style="color:#6B7770; font-size:13.5px; margin-top:6px;">Pega aquí la URL de tu Apps Script (solo la primera vez en este dispositivo)</div>
+      </div>
+      <input type="text" id="config-url-input" placeholder="https://script.google.com/macros/s/..." style="width:100%; padding:12px; border:1.5px solid #E4DFD3; border-radius:10px; font-size:14px;">
+      <button id="config-save-btn" style="width:100%; margin-top:14px; background:#FF8A3D; color:#fff; border:none; border-radius:10px; padding:13px; font-weight:700; font-size:15px; cursor:pointer;">Guardar y continuar</button>
+      <div style="margin-top:18px; font-size:12.5px; color:#6B7770; line-height:1.6;">Esta URL la obtienes al desplegar el Apps Script como "Aplicación web" (ver instrucciones que te dio Claude). Solo necesitas hacer esto una vez por dispositivo.</div>
+    </div>
+  `;
+}
+
+function attachConfigHandlers(){
+  const btn = document.getElementById('config-save-btn');
+  const input = document.getElementById('config-url-input');
+  if(btn) btn.onclick = ()=>{
+    if(input.value.trim().startsWith('http')){
+      saveApiUrlAndStart(input.value);
+    }else{
+      alert('Pega una URL válida (empieza con https://)');
+    }
+  };
+}
+
+function navItem(id, icon, label){
+  return `<button class="nav-item ${currentTab===id?'active':''}" data-nav="${id}">
+    <span class="ic">${icon}</span><span class="lb">${label}</span>
+  </button>`;
+}
+
+function renderNuevoPedido(){
+  const clientNew = isNewClient();
+  const productOptions = state.products.map(p=>`<option value="${p.id}">${p.brand} — ${p.name} (${CURRENCY.format(p.price)})</option>`).join('');
+  const itemsHtml = orderForm.items.map((it, idx)=>`
+    <div class="product-row">
+      <select data-item-idx="${idx}" data-field="productId">${
+        state.products.map(p=>`<option value="${p.id}" ${p.id===it.productId?'selected':''}>${p.brand} — ${p.name}</option>`).join('')
+      }</select>
+      <input type="number" min="1" value="${it.qty}" data-item-idx="${idx}" data-field="qty">
+      ${orderForm.items.length>1 ? `<button class="icon-btn" data-remove-item="${idx}">✕</button>` : '<span style="width:34px;display:inline-block;"></span>'}
+    </div>
+  `).join('');
+  const subtotal = orderItemsTotal(orderForm.items);
+  const discount = Math.min(orderForm.discount||0, subtotal);
+  const total = Math.max(0, subtotal - discount);
+  const clientList = state.clients.map(c=>`<option value="${c.name}">`).join('');
+  const comunaSet = Array.from(new Set(state.clients.map(c=>c.comuna).filter(c=>c && c.trim())));
+  const comunaListHtml = comunaSet.map(c=>`<option value="${escapeHtml(c)}">`).join('');
+
+  return `
+    <h2 class="section-title">📝 Nuevo pedido</h2>
+    <div class="card">
+      <label>Nombre del cliente</label>
+      <input type="text" id="f-name" list="client-list" value="${escapeHtml(orderForm.clientName)}" placeholder="Ej: María Pérez">
+      <datalist id="client-list">${clientList}</datalist>
+
+      <div class="row-flex">
+        <div>
+          <label>Teléfono</label>
+          <input type="tel" id="f-phone" value="${escapeHtml(orderForm.phone)}" placeholder="+56 9 1234 5678">
+        </div>
+        <div>
+          <label>Horario de entrega</label>
+          <input type="text" id="f-horario" value="${escapeHtml(orderForm.horario)}" placeholder="Ej: 14:00 - 16:00">
+        </div>
+      </div>
+
+      <label>Dirección</label>
+      <input type="text" id="f-address" value="${escapeHtml(orderForm.address)}" placeholder="Calle y número">
+
+      <label>Comuna</label>
+      <input type="text" id="f-comuna" list="comuna-list" value="${escapeHtml(orderForm.comuna)}" placeholder="Ej: Peñalolén">
+      <datalist id="comuna-list">${comunaListHtml}</datalist>
+
+      <label>Fecha de entrega</label>
+      <div class="row-flex" style="align-items:center;">
+        <input type="date" id="f-date" value="${orderForm.deliveryDate}" style="flex:1.4;">
+        <button type="button" class="btn btn-outline btn-sm" id="date-today" style="flex:0.8;">Hoy</button>
+        <button type="button" class="btn btn-outline btn-sm" id="date-tomorrow" style="flex:0.8;">Mañana</button>
+      </div>
+
+      <div class="client-status">
+        <span class="badge ${clientNew?'badge-new':'badge-old'}">${clientNew?'Cliente nuevo':'Cliente antiguo'}</span>
+        <button class="icon-btn" style="color:var(--text-muted); font-size:13px;" id="toggle-client-type">cambiar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label style="margin-top:0;">Productos del pedido</label>
+      ${itemsHtml}
+      <button class="add-row-btn" id="add-product-row">+ Agregar otro producto</button>
+
+      <label>Descuento ($)</label>
+      <input type="number" min="0" step="1" id="f-discount" value="${orderForm.discount||0}" placeholder="0">
+
+      <div class="order-total" style="border-top:none; padding-top:0; margin-top:8px;">
+        <span>Subtotal</span>
+        <span>${CURRENCY.format(subtotal)}</span>
+      </div>
+      ${discount>0 ? `<div class="order-total" style="border-top:none; padding-top:0; margin-top:2px; color:var(--danger);">
+        <span>Descuento</span>
+        <span>- ${CURRENCY.format(discount)}</span>
+      </div>` : ''}
+      <div class="order-total">
+        <span>Total pedido</span>
+        <span class="amt">${CURRENCY.format(total)}</span>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="submit-order">Agregar a la ruta →</button>
+  `;
+}
+
+function comunaLabelOf(o){
+  return (o.comuna && o.comuna.trim()) ? o.comuna.trim() : 'Sin comuna';
+}
+
+function sortByComuna(list){
+  return [...list].sort((a,b)=>{
+    const ca = comunaLabelOf(a).toLowerCase();
+    const cb = comunaLabelOf(b).toLowerCase();
+    if(ca!==cb) return ca.localeCompare(cb,'es');
+    return a.createdAt-b.createdAt;
+  });
+}
+
+function renderRuta(){
+  const pending = sortByComuna(state.orders.filter(o=>o.status==='pending' && (o.deliveryDate||todayISO())===routeDate));
+  const isToday = routeDate===todayISO();
+  const dateNav = `
+    <div class="row-flex" style="margin-bottom:12px; align-items:center;">
+      <button type="button" class="btn btn-outline btn-sm" id="route-prev-day">◀</button>
+      <div style="flex:2; text-align:center; font-weight:600; color:var(--primary-dark); text-transform:capitalize;">${formatDateNice(routeDate)}</div>
+      <button type="button" class="btn btn-outline btn-sm" id="route-next-day">▶</button>
+    </div>
+    ${!isToday ? `<button type="button" class="btn btn-outline btn-sm" id="route-today" style="width:100%; margin-bottom:12px;">Volver a hoy</button>` : ''}
+  `;
+  if(!pending.length){
+    return `<h2 class="section-title">🚚 Ruta ${isToday?'del día':''}</h2>
+      ${dateNav}
+      <div class="empty-state"><div class="paw">🐾</div>No hay pedidos programados para esta fecha.<br>Agrega uno desde "Nuevo".</div>`;
+  }
+  let lastComuna = null;
+  const ticketsHtml = pending.map(o=>{
+    const label = comunaLabelOf(o);
+    let header = '';
+    if(label !== lastComuna){
+      lastComuna = label;
+      header = `<div style="font-family:'Baloo 2',sans-serif; font-weight:700; font-size:14px; color:var(--primary); margin:18px 0 8px; display:flex; align-items:center; gap:6px;">📍 ${escapeHtml(label)}</div>`;
+    }
+    return header + renderTicket(o);
+  }).join('');
+  return `<h2 class="section-title">🚚 Ruta ${isToday?'del día':''} <span style="font-size:13px; color:var(--text-muted); font-weight:500;">(${pending.length} pendiente${pending.length>1?'s':''})</span></h2>
+    ${dateNav}
+    <button type="button" class="btn btn-outline" style="width:100%; margin-bottom:14px;" id="download-manifest">🖼️ Descargar manifiesto de ruta (imagen)</button>
+    ${ticketsHtml}`;
+}
+
+function renderTicket(o){
+  const prod = o.items.map(it=>{
+    const p = state.products.find(pp=>pp.id===it.productId);
+    return `<div class="prod-line"><span>${it.qty}× ${p?p.name:'(producto eliminado)'}</span><span>${CURRENCY.format((p?p.price:0)*it.qty)}</span></div>`;
+  }).join('');
+  const subtotal = orderItemsTotal(o.items);
+  const discount = Math.min(o.discount||0, subtotal);
+  const total = orderNetTotal(o);
+  const waRuta = `https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(`Hola ${o.clientName} 👋, tu pedido de *Fast Pet* está programado para hoy entre las ${o.horario||'la tarde'} hrs. Cualquier consulta, escríbenos por aquí. ¡Gracias por preferirnos! 🐾`)}`;
+  const waCamino = `https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(`Hola ${o.clientName} 👋, ¡ya vamos en camino a tu domicilio con tu pedido de *Fast Pet*! 🚚🐾 Llegamos en breve.`)}`;
+  return `
+    <div class="ticket">
+      <div class="ticket-top">
+        <div class="ticket-client">
+          <div class="name">${escapeHtml(o.clientName)}</div>
+          <span class="badge ${o.clientType==='nuevo'?'badge-new':'badge-old'}">${o.clientType==='nuevo'?'Nuevo':'Antiguo'}</span>
+        </div>
+        <div class="ticket-meta">
+          📍 <b>${escapeHtml(o.address)}</b>${o.comuna ? ', ' + escapeHtml(o.comuna) : ''}<br>
+          📞 ${escapeHtml(o.phone)} &nbsp;·&nbsp; ⏰ ${escapeHtml(o.horario||'sin horario')}
+        </div>
+      </div>
+      <div class="ticket-divider"></div>
+      <div class="ticket-products">
+        ${prod}
+        ${discount>0 ? `<div class="prod-line" style="color:var(--danger);"><span>Descuento</span><span>- ${CURRENCY.format(discount)}</span></div>` : ''}
+        <div class="ticket-total"><span>Total</span><span>${CURRENCY.format(total)}</span></div>
+      </div>
+      <div class="ticket-actions">
+        <a class="btn btn-whatsapp btn-sm" href="${waRuta}" target="_blank" rel="noopener">📍 Avisar ruta</a>
+        <a class="btn btn-whatsapp btn-sm" href="${waCamino}" target="_blank" rel="noopener">🚗 Voy en camino</a>
+      </div>
+      <div class="ticket-actions" style="padding-top:0;">
+        <button class="btn btn-success btn-sm" data-deliver="${o.id}" style="flex:1;">✅ Marcar entregado</button>
+        <button class="btn btn-outline btn-sm" data-delete-order="${o.id}" style="flex:0; color:var(--danger); border-color:var(--danger);">🗑️ Eliminar</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderPaymentModal(){
+  const o = state.orders.find(x=>x.id===paymentModalOrderId);
+  if(!o) return '';
+  const opts = [
+    {k:'efectivo', em:'💵', lb:'Efectivo'},
+    {k:'tarjeta', em:'💳', lb:'Tarjeta'},
+    {k:'transferencia', em:'🏦', lb:'Transferencia'},
+    {k:'credito', em:'📒', lb:'Crédito'},
+    {k:'pendiente', em:'⏳', lb:'Pendiente'},
+  ];
+  return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <h3>¿Cómo pagó ${escapeHtml(o.clientName)}?</h3>
+        <p>Selecciona el medio de pago para cerrar este pedido.</p>
+        <div class="pay-grid">
+          ${opts.map(op=>`<div class="pay-opt" data-pay="${op.k}"><span class="em">${op.em}</span>${op.lb}</div>`).join('')}
+        </div>
+        <button class="modal-cancel" id="cancel-payment">Cancelar</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderVentas(){
+  const deliveredAll = state.orders.filter(o=>o.status==='delivered');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayOrders = deliveredAll.filter(o=>o.deliveredAt >= today.getTime());
+  const todayTotal = todayOrders.reduce((s,o)=>s+orderNetTotal(o),0);
+  const allTotal = deliveredAll.reduce((s,o)=>s+orderNetTotal(o),0);
+
+  const monthOrders = deliveredAll.filter(o=>monthFromTimestamp(o.deliveredAt)===ventasMonth).sort((a,b)=>b.deliveredAt-a.deliveredAt);
+  const isCurrentMonth = ventasMonth===currentMonthISO();
+  const monthVentas = monthOrders.reduce((s,o)=>s+orderNetTotal(o),0);
+  const monthUtilidad = monthOrders.reduce((s,o)=>s+orderUtilidad(o),0);
+  const monthSacos = monthOrders.reduce((s,o)=>s+orderSacos(o),0);
+  const monthClientesNuevos = monthOrders.filter(o=>o.clientType==='nuevo').length;
+
+  const payLabel = {efectivo:'Efectivo',tarjeta:'Tarjeta',transferencia:'Transferencia',credito:'Crédito',pendiente:'Pendiente'};
+  const payMethods = ['efectivo','tarjeta','transferencia','credito','pendiente'];
+  const byMethod = {};
+  payMethods.forEach(k=>byMethod[k]=0);
+  monthOrders.forEach(o=>{
+    const key = o.paymentMethod && payMethods.includes(o.paymentMethod) ? o.paymentMethod : 'pendiente';
+    byMethod[key] += orderNetTotal(o);
+  });
+
+  const monthNav = `
+    <div class="row-flex" style="margin:4px 0 12px; align-items:center;">
+      <button type="button" class="btn btn-outline btn-sm" id="ventas-month-prev">◀</button>
+      <div style="flex:2; text-align:center; font-weight:600; color:var(--primary-dark);">${monthLabelNice(ventasMonth)}</div>
+      <button type="button" class="btn btn-outline btn-sm" id="ventas-month-next">▶</button>
+    </div>
+    ${!isCurrentMonth ? `<button type="button" class="btn btn-outline btn-sm" id="ventas-month-current" style="width:100%; margin-bottom:12px;">Volver a este mes</button>` : ''}
+  `;
+
+  return `
+    <h2 class="section-title">📊 Ventas</h2>
+    <div class="summary-bar">
+      <div class="summary-box">
+        <div class="lbl">Hoy · ${todayOrders.length} entregas</div>
+        <div class="val">${CURRENCY.format(todayTotal)}</div>
+      </div>
+      <div class="summary-box" style="background:var(--accent-dark);">
+        <div class="lbl">Total histórico</div>
+        <div class="val">${CURRENCY.format(allTotal)}</div>
+      </div>
+    </div>
+
+    <label style="margin-top:0;">📅 Resumen mensual</label>
+    ${monthNav}
+    <div class="summary-bar">
+      <div class="summary-box">
+        <div class="lbl">Ventas del mes</div>
+        <div class="val">${CURRENCY.format(monthVentas)}</div>
+      </div>
+      <div class="summary-box" style="background:var(--success);">
+        <div class="lbl">Utilidad del mes</div>
+        <div class="val">${CURRENCY.format(monthUtilidad)}</div>
+      </div>
+    </div>
+    <div class="summary-bar">
+      <div class="summary-box" style="background:var(--accent-dark);">
+        <div class="lbl">Sacos vendidos</div>
+        <div class="val">${monthSacos}</div>
+      </div>
+      <div class="summary-box" style="background:var(--primary-light);">
+        <div class="lbl">Clientes nuevos</div>
+        <div class="val">${monthClientesNuevos}</div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-outline" style="width:100%; margin-bottom:14px;" id="download-month-summary">🖼️ Descargar resumen del mes (imagen)</button>
+
+    <label style="margin-top:0;">Total por medio de pago (${monthLabelNice(ventasMonth)})</label>
+    <div class="card" style="padding:10px 14px;">
+      ${payMethods.map(k=>`
+        <div class="line" style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
+          <span class="pill">${payLabel[k]}</span>
+          <span style="font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--primary-dark);">${CURRENCY.format(byMethod[k])}</span>
+        </div>
+      `).join('')}
+    </div>
+
+    ${monthOrders.length ? `<button class="btn btn-outline" style="width:100%; margin-bottom:14px;" id="export-csv">⬇ Exportar CSV para Google Sheets / Excel</button>` : ''}
+    ${!monthOrders.length ? `<div class="empty-state"><div class="paw">📦</div>No hay ventas registradas en ${monthLabelNice(ventasMonth)}.</div>` : monthOrders.map(o=>{
+      const total = orderNetTotal(o);
+      const items = o.items.map(it=>{
+        const p = state.products.find(pp=>pp.id===it.productId);
+        return `${it.qty}× ${p?p.name:'—'}`;
+      }).join(', ');
+      const d = new Date(o.deliveredAt);
+      const payOptsHtml = payMethods.map(k=>`<option value="${k}" ${o.paymentMethod===k?'selected':''}>${payLabel[k]}</option>`).join('');
+      const waThanks = `https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(`¡Hola ${o.clientName}! 🐾 Muchas gracias por tu compra en *Fast Pet*. Esperamos que tus mascotas disfruten su pedido. Cuando necesites reponer, no dudes en contactarnos. ¡Gracias por preferirnos! 💚`)}`;
+      return `<div class="sale-row">
+        <div class="top">
+          <span>${escapeHtml(o.clientName)}</span>
+          <span>${CURRENCY.format(total)}</span>
+        </div>
+        <div class="line">${items}</div>
+        <div class="line">📍 ${escapeHtml(o.address)} · ${d.toLocaleDateString('es-CL')} ${d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</div>
+        <div class="line" style="margin-top:6px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+          <select data-change-pay="${o.id}" style="width:auto; padding:4px 8px; font-size:11px; border-radius:20px; border:1.5px solid var(--border);">${payOptsHtml}</select>
+          <span class="pill">${o.clientType==='nuevo'?'Nuevo':'Antiguo'}</span>
+          <a class="btn btn-whatsapp btn-sm" style="flex:0; padding:6px 10px; font-size:11px;" href="${waThanks}" target="_blank" rel="noopener">💬 Agradecer</a>
+        </div>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+function renderGastos(){
+  const catLabel = {combustible:'Combustible',mantencion:'Mantención',insumos:'Insumos',sueldos:'Sueldos',otro:'Otro'};
+  const sorted = [...state.expenses].sort((a,b)=>b.createdAt-a.createdAt);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayExp = sorted.filter(e=>e.createdAt >= today.getTime());
+  const todayTotal = todayExp.reduce((s,e)=>s+(e.amount||0),0);
+  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+  const monthExp = sorted.filter(e=>e.createdAt >= monthStart.getTime());
+  const monthTotal = monthExp.reduce((s,e)=>s+(e.amount||0),0);
+
+  return `
+    <h2 class="section-title">💸 Gastos</h2>
+    <div class="summary-bar">
+      <div class="summary-box">
+        <div class="lbl">Hoy</div>
+        <div class="val">${CURRENCY.format(todayTotal)}</div>
+      </div>
+      <div class="summary-box" style="background:var(--accent-dark);">
+        <div class="lbl">Este mes</div>
+        <div class="val">${CURRENCY.format(monthTotal)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label style="margin-top:0;">Descripción</label>
+      <input type="text" id="ex-description" value="${escapeHtml(expenseForm.description)}" placeholder="Ej: Bencina camioneta">
+
+      <div class="row-flex">
+        <div>
+          <label>Monto ($)</label>
+          <input type="number" min="0" step="1" id="ex-amount" value="${expenseForm.amount||0}" placeholder="0">
+        </div>
+        <div>
+          <label>Categoría</label>
+          <select id="ex-category">
+            ${Object.keys(catLabel).map(k=>`<option value="${k}" ${expenseForm.category===k?'selected':''}>${catLabel[k]}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="add-expense">+ Registrar gasto</button>
+    </div>
+
+    ${!sorted.length ? `<div class="empty-state"><div class="paw">💸</div>Todavía no hay gastos registrados.</div>` : sorted.map(e=>{
+      const d = new Date(e.createdAt);
+      return `<div class="sale-row">
+        <div class="top"><span>${escapeHtml(e.description)}</span><span>${CURRENCY.format(e.amount||0)}</span></div>
+        <div class="line">${d.toLocaleDateString('es-CL')} ${d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</div>
+        <div class="line" style="margin-top:6px; display:flex; gap:6px; align-items:center;">
+          <span class="pill">${catLabel[e.category]||e.category}</span>
+          <button class="icon-btn" data-delete-expense="${e.id}" style="margin-left:auto;">✕</button>
+        </div>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+function renderCatalogo(){
+  return `
+    <h2 class="section-title">📦 Catálogo de productos</h2>
+    <div class="card">
+      <div style="display:flex; gap:8px; margin-bottom:6px; font-size:11px; color:var(--text-muted); font-weight:600;">
+        <span style="flex:1 1 110px;">Marca</span>
+        <span style="flex:1 1 150px;">Producto</span>
+        <span style="flex:1 1 85px;">Precio</span>
+        <span style="flex:1 1 85px;">Costo</span>
+        <span style="width:34px;"></span>
+      </div>
+      ${state.products.map((p,idx)=>`
+        <div class="catalog-row" style="flex-wrap:wrap;">
+          <input type="text" data-cat-idx="${idx}" data-cat-field="brand" value="${escapeHtml(p.brand)}" placeholder="Marca" style="flex:1 1 110px;">
+          <input type="text" data-cat-idx="${idx}" data-cat-field="name" value="${escapeHtml(p.name)}" placeholder="Producto" style="flex:1 1 150px;">
+          <input type="number" class="price" data-cat-idx="${idx}" data-cat-field="price" value="${p.price}" placeholder="Precio" style="flex:1 1 85px;">
+          <input type="number" class="price" data-cat-idx="${idx}" data-cat-field="cost" value="${p.cost||0}" placeholder="Costo" style="flex:1 1 85px;">
+          <button class="icon-btn" data-cat-remove="${idx}">✕</button>
+        </div>
+      `).join('')}
+      <button class="add-row-btn" id="add-product">+ Agregar producto</button>
+      <button class="btn btn-primary" id="save-catalog">Guardar catálogo</button>
+    </div>
+  `;
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------- Event handling ----------
+function attachHandlers(){
+  const settingsBtn = document.getElementById('settings-btn');
+  if(settingsBtn) settingsBtn.onclick = ()=>{
+    if(confirm('¿Cambiar la URL de conexión con tu hoja de Google?')){
+      localStorage.removeItem('fastpet_api_url');
+      apiUrl = '';
+      state.loaded = 'config';
+      render();
+    }
+  };
+  document.querySelectorAll('[data-nav]').forEach(btn=>{
+    btn.onclick = ()=>{ currentTab = btn.dataset.nav; render(); };
+  });
+
+  if(currentTab==='nuevo'){
+    const nameEl = document.getElementById('f-name');
+    if(nameEl){
+      nameEl.oninput = e=>{ orderForm.clientName = e.target.value; orderForm.forceNew=null; };
+      nameEl.onblur = ()=>{ render(); };
+    }
+    const phoneEl = document.getElementById('f-phone');
+    if(phoneEl){
+      phoneEl.oninput = e=>{ orderForm.phone = e.target.value; orderForm.forceNew=null; };
+      phoneEl.onblur = ()=>{
+        const match = findClientByPhone(orderForm.phone);
+        if(match){
+          if(!orderForm.clientName.trim()) orderForm.clientName = match.name;
+          if(!orderForm.address.trim()) orderForm.address = match.address;
+          if(!orderForm.comuna.trim()) orderForm.comuna = match.comuna || '';
+        }
+        render();
+      };
+    }
+    const addrEl = document.getElementById('f-address');
+    if(addrEl) addrEl.oninput = e=>{ orderForm.address = e.target.value; };
+    const comunaEl = document.getElementById('f-comuna');
+    if(comunaEl) comunaEl.oninput = e=>{ orderForm.comuna = e.target.value; };
+    const horEl = document.getElementById('f-horario');
+    if(horEl) horEl.oninput = e=>{ orderForm.horario = e.target.value; };
+    const discEl = document.getElementById('f-discount');
+    if(discEl){
+      discEl.oninput = e=>{ orderForm.discount = Math.max(0, parseInt(e.target.value)||0); };
+      discEl.onblur = ()=>{ render(); };
+    }
+    const dateEl = document.getElementById('f-date');
+    if(dateEl) dateEl.onchange = e=>{ orderForm.deliveryDate = e.target.value || todayISO(); render(); };
+    const dateTodayBtn = document.getElementById('date-today');
+    if(dateTodayBtn) dateTodayBtn.onclick = ()=>{ orderForm.deliveryDate = todayISO(); render(); };
+    const dateTomorrowBtn = document.getElementById('date-tomorrow');
+    if(dateTomorrowBtn) dateTomorrowBtn.onclick = ()=>{ orderForm.deliveryDate = addDaysISO(todayISO(),1); render(); };
+
+    const toggleBtn = document.getElementById('toggle-client-type');
+    if(toggleBtn) toggleBtn.onclick = ()=>{ orderForm.forceNew = !isNewClient(); render(); };
+
+    document.querySelectorAll('[data-item-idx]').forEach(el=>{
+      el.onchange = e=>{
+        const idx = +el.dataset.itemIdx;
+        const field = el.dataset.field;
+        if(field==='qty') orderForm.items[idx].qty = Math.max(1, parseInt(el.value)||1);
+        else orderForm.items[idx].productId = el.value;
+        render();
+      };
+    });
+    document.querySelectorAll('[data-remove-item]').forEach(el=>{
+      el.onclick = ()=>{
+        orderForm.items.splice(+el.dataset.removeItem, 1);
+        render();
+      };
+    });
+    const addRow = document.getElementById('add-product-row');
+    if(addRow) addRow.onclick = ()=>{
+      orderForm.items.push({productId: state.products[0]?state.products[0].id:'', qty:1});
+      render();
+    };
+    const submitBtn = document.getElementById('submit-order');
+    if(submitBtn) submitBtn.onclick = handleSubmitOrder;
+  }
+
+  if(currentTab==='ruta'){
+    document.querySelectorAll('[data-deliver]').forEach(el=>{
+      el.onclick = ()=>{ paymentModalOrderId = el.dataset.deliver; render(); };
+    });
+    document.querySelectorAll('[data-delete-order]').forEach(el=>{
+      el.onclick = ()=>{
+        const id = el.dataset.deleteOrder;
+        const o = state.orders.find(x=>x.id===id);
+        if(o && confirm(`¿Eliminar el pedido de ${o.clientName}? Esta acción no se puede deshacer.`)){
+          deleteOrder(id);
+        }
+      };
+    });
+    const prevBtn = document.getElementById('route-prev-day');
+    if(prevBtn) prevBtn.onclick = ()=>{ routeDate = addDaysISO(routeDate,-1); render(); };
+    const nextBtn = document.getElementById('route-next-day');
+    if(nextBtn) nextBtn.onclick = ()=>{ routeDate = addDaysISO(routeDate,1); render(); };
+    const todayBtn = document.getElementById('route-today');
+    if(todayBtn) todayBtn.onclick = ()=>{ routeDate = todayISO(); render(); };
+    const manifestBtn = document.getElementById('download-manifest');
+    if(manifestBtn) manifestBtn.onclick = downloadManifest;
+  }
+
+  if(paymentModalOrderId){
+    document.querySelectorAll('[data-pay]').forEach(el=>{
+      el.onclick = ()=> confirmDelivery(el.dataset.pay);
+    });
+    const cancel = document.getElementById('cancel-payment');
+    if(cancel) cancel.onclick = ()=>{ paymentModalOrderId=null; render(); };
+    const backdrop = document.getElementById('modal-backdrop');
+    if(backdrop) backdrop.onclick = (e)=>{ if(e.target.id==='modal-backdrop'){ paymentModalOrderId=null; render(); } };
+  }
+
+  if(currentTab==='ventas'){
+    const monthOrdersNow = state.orders.filter(o=>o.status==='delivered' && monthFromTimestamp(o.deliveredAt)===ventasMonth);
+    const exportBtn = document.getElementById('export-csv');
+    if(exportBtn) exportBtn.onclick = ()=> exportCsv(monthOrdersNow);
+    document.querySelectorAll('[data-change-pay]').forEach(el=>{
+      el.onchange = async ()=>{
+        const o = state.orders.find(x=>x.id===el.dataset.changePay);
+        if(o){
+          o.paymentMethod = el.value;
+          await saveOrders();
+          render();
+          showToast('Medio de pago actualizado ✅');
+        }
+      };
+    });
+    const monthPrevBtn = document.getElementById('ventas-month-prev');
+    if(monthPrevBtn) monthPrevBtn.onclick = ()=>{ ventasMonth = addMonthsISO(ventasMonth,-1); render(); };
+    const monthNextBtn = document.getElementById('ventas-month-next');
+    if(monthNextBtn) monthNextBtn.onclick = ()=>{ ventasMonth = addMonthsISO(ventasMonth,1); render(); };
+    const monthCurBtn = document.getElementById('ventas-month-current');
+    if(monthCurBtn) monthCurBtn.onclick = ()=>{ ventasMonth = currentMonthISO(); render(); };
+    const downloadMonthBtn = document.getElementById('download-month-summary');
+    if(downloadMonthBtn) downloadMonthBtn.onclick = downloadMonthlySummary;
+  }
+
+  if(currentTab==='catalogo'){
+    document.querySelectorAll('[data-cat-idx]').forEach(el=>{
+      el.oninput = ()=>{
+        const idx = +el.dataset.catIdx;
+        const field = el.dataset.catField;
+        state.products[idx][field] = (field==='price'||field==='cost') ? (parseInt(el.value)||0) : el.value;
+      };
+    });
+    document.querySelectorAll('[data-cat-remove]').forEach(el=>{
+      el.onclick = ()=>{ state.products.splice(+el.dataset.catRemove,1); render(); };
+    });
+    const addP = document.getElementById('add-product');
+    if(addP) addP.onclick = ()=>{
+      state.products.push({id:uid('p'), brand:'', name:'', price:0, cost:0});
+      render();
+    };
+    const saveBtn = document.getElementById('save-catalog');
+    if(saveBtn) saveBtn.onclick = async ()=>{
+      await saveProducts();
+      showToast('Catálogo guardado ✅');
+    };
+  }
+
+  if(currentTab==='gastos'){
+    const descEl = document.getElementById('ex-description');
+    if(descEl) descEl.oninput = e=>{ expenseForm.description = e.target.value; };
+    const amtEl = document.getElementById('ex-amount');
+    if(amtEl) amtEl.oninput = e=>{ expenseForm.amount = Math.max(0, parseInt(e.target.value)||0); };
+    const catEl = document.getElementById('ex-category');
+    if(catEl) catEl.onchange = e=>{ expenseForm.category = e.target.value; };
+    const addExpBtn = document.getElementById('add-expense');
+    if(addExpBtn) addExpBtn.onclick = async ()=>{
+      if(!expenseForm.description.trim()){ showToast('Falta la descripción del gasto'); return; }
+      if(!expenseForm.amount || expenseForm.amount<=0){ showToast('Ingresa un monto válido'); return; }
+      state.expenses.push({
+        id: uid('e'),
+        description: expenseForm.description.trim(),
+        amount: expenseForm.amount,
+        category: expenseForm.category,
+        createdAt: Date.now()
+      });
+      await saveExpenses();
+      resetExpenseForm();
+      render();
+      showToast('Gasto registrado 💸');
+    };
+    document.querySelectorAll('[data-delete-expense]').forEach(el=>{
+      el.onclick = async ()=>{
+        if(confirm('¿Eliminar este gasto?')){
+          state.expenses = state.expenses.filter(e=>e.id!==el.dataset.deleteExpense);
+          await saveExpenses();
+          render();
+          showToast('Gasto eliminado 🗑️');
+        }
+      };
+    });
+  }
+}
+
+async function handleSubmitOrder(){
+  if(!orderForm.clientName.trim()){ showToast('Falta el nombre del cliente'); return; }
+  if(!orderForm.phone.trim()){ showToast('Falta el teléfono'); return; }
+  if(!orderForm.address.trim()){ showToast('Falta la dirección'); return; }
+  const clientType = isNewClient() ? 'nuevo' : 'antiguo';
+
+  const order = {
+    id: uid('o'),
+    clientName: orderForm.clientName.trim(),
+    phone: orderForm.phone.trim(),
+    address: orderForm.address.trim(),
+    comuna: orderForm.comuna.trim(),
+    horario: orderForm.horario.trim(),
+    items: orderForm.items.filter(it=>it.productId),
+    discount: Math.max(0, orderForm.discount||0),
+    deliveryDate: orderForm.deliveryDate || todayISO(),
+    clientType,
+    status: 'pending',
+    createdAt: Date.now(),
+    deliveredAt: null,
+    paymentMethod: null
+  };
+  state.orders.push(order);
+  await saveOrders();
+
+  const existingClient = findClientByPhone(order.phone);
+  if(!existingClient){
+    state.clients.push({name:order.clientName, phone:order.phone, address:order.address, comuna:order.comuna});
+    await saveClients();
+  }else if(order.comuna && !existingClient.comuna){
+    existingClient.comuna = order.comuna;
+    await saveClients();
+  }
+
+  routeDate = order.deliveryDate;
+  resetOrderForm();
+  currentTab = 'ruta';
+  render();
+  showToast(order.deliveryDate===todayISO() ? 'Pedido agregado a la ruta 🚚' : `Pedido agendado para ${formatDateNice(order.deliveryDate)} 📅`);
+}
+
+async function deleteOrder(id){
+  state.orders = state.orders.filter(o=>o.id!==id);
+  await saveOrders();
+  render();
+  showToast('Pedido eliminado 🗑️');
+}
+
+async function confirmDelivery(method){
+  const o = state.orders.find(x=>x.id===paymentModalOrderId);
+  if(o){
+    o.status = 'delivered';
+    o.paymentMethod = method;
+    o.deliveredAt = Date.now();
+    await saveOrders();
+  }
+  paymentModalOrderId = null;
+  render();
+  showToast('Pedido marcado como entregado ✅');
+}
+
+function exportCsv(list){
+  const delivered = [...(list || state.orders.filter(o=>o.status==='delivered'))].sort((a,b)=>a.deliveredAt-b.deliveredAt);
+  const payLabel = {efectivo:'Efectivo',tarjeta:'Tarjeta',transferencia:'Transferencia',credito:'Crédito',pendiente:'Pendiente'};
+  const rows = [['Fecha','Hora','Cliente','Telefono','Direccion','Comuna','Productos','Descuento','Total','MedioPago','TipoCliente','Horario']];
+  delivered.forEach(o=>{
+    const d = new Date(o.deliveredAt);
+    const items = o.items.map(it=>{
+      const p = state.products.find(pp=>pp.id===it.productId);
+      return `${it.qty}x ${p?p.name:'-'}`;
+    }).join(' | ');
+    rows.push([
+      d.toLocaleDateString('es-CL'),
+      d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}),
+      o.clientName, o.phone, o.address, o.comuna||'', items,
+      o.discount||0, orderNetTotal(o), payLabel[o.paymentMethod]||o.paymentMethod,
+      o.clientType, o.horario||''
+    ]);
+  });
+  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `fastpet_ventas_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadManifest(){
+  const pending = sortByComuna(state.orders.filter(o=>o.status==='pending' && (o.deliveryDate||todayISO())===routeDate));
+  if(!pending.length){ showToast('No hay pedidos para generar el manifiesto'); return; }
+
+  const W = 900;
+  const rowH = 130;
+  const headerH = 130;
+  const groupHeaderH = 50;
+
+  let groupsCount = 0;
+  let prevComunaCount = null;
+  pending.forEach(o=>{
+    const c = comunaLabelOf(o);
+    if(c !== prevComunaCount){ groupsCount++; prevComunaCount = c; }
+  });
+
+  const H = headerH + groupsCount*groupHeaderH + pending.length*rowH + 40;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#FAF7F1';
+  ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = '#1F4B43';
+  ctx.fillRect(0,0,W,90);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 30px sans-serif';
+  ctx.fillText('🐾 Fast Pet — Manifiesto de ruta', 24, 46);
+  ctx.font = '16px sans-serif';
+  ctx.fillStyle = '#CFE3DC';
+  ctx.fillText(formatDateNice(routeDate) + '  ·  ' + pending.length + ' pedido' + (pending.length>1?'s':''), 24, 74);
+
+  let y = headerH;
+  let lastComuna = null;
+  pending.forEach((o, idx)=>{
+    const comunaLabel = comunaLabelOf(o);
+    if(comunaLabel !== lastComuna){
+      lastComuna = comunaLabel;
+      ctx.fillStyle = '#E8E2D4';
+      roundRect(ctx, 20, y, W-40, groupHeaderH-12, 10);
+      ctx.fill();
+      ctx.fillStyle = '#153731';
+      ctx.font = 'bold 19px sans-serif';
+      ctx.fillText('📍 ' + comunaLabel, 34, y+27);
+      y += groupHeaderH;
+    }
+
+    const total = orderNetTotal(o);
+    const items = o.items.map(it=>{
+      const p = state.products.find(pp=>pp.id===it.productId);
+      return `${it.qty}x ${p?p.name:'-'}`;
+    }).join(', ');
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#E4DFD3';
+    ctx.lineWidth = 1;
+    roundRect(ctx, 20, y, W-40, rowH-14, 12);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#FF8A3D';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText('#'+(idx+1), 36, y+34);
+
+    ctx.fillStyle = '#153731';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillText(o.clientName, 80, y+34);
+
+    ctx.font = '16px sans-serif';
+    ctx.fillStyle = '#26302C';
+    ctx.fillText('📍 ' + o.address, 36, y+62);
+    ctx.fillText('📞 ' + o.phone + (o.horario ? ('   ⏰ ' + o.horario) : ''), 36, y+86);
+
+    ctx.fillStyle = '#6B7770';
+    ctx.font = '14px sans-serif';
+    wrapText(ctx, items, 36, y+108, W-100, 18);
+
+    ctx.fillStyle = '#153731';
+    ctx.font = 'bold 18px monospace';
+    const totalText = CURRENCY.format(total);
+    const tw = ctx.measureText(totalText).width;
+    ctx.fillText(totalText, W-40-tw, y+34);
+
+    y += rowH;
+  });
+
+  const link = document.createElement('a');
+  link.download = `fastpet_manifiesto_${routeDate}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  showToast('Manifiesto descargado 🖼️');
+}
+
+function downloadMonthlySummary(){
+  const monthOrders = state.orders.filter(o=>o.status==='delivered' && monthFromTimestamp(o.deliveredAt)===ventasMonth);
+  if(!monthOrders.length){ showToast('No hay ventas registradas para este mes'); return; }
+
+  const totalVentas = monthOrders.reduce((s,o)=>s+orderNetTotal(o),0);
+  const totalUtilidad = monthOrders.reduce((s,o)=>s+orderUtilidad(o),0);
+  const totalSacos = monthOrders.reduce((s,o)=>s+orderSacos(o),0);
+  const clientesNuevos = monthOrders.filter(o=>o.clientType==='nuevo').length;
+
+  const W = 720, H = 620;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#FAF7F1';
+  ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = '#1F4B43';
+  ctx.fillRect(0,0,W,110);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 28px sans-serif';
+  ctx.fillText('🐾 Fast Pet — Resumen mensual', 24, 50);
+  ctx.font = '18px sans-serif';
+  ctx.fillStyle = '#CFE3DC';
+  ctx.fillText(monthLabelNice(ventasMonth), 24, 84);
+
+  const stats = [
+    {lbl:'Total ventas', val: CURRENCY.format(totalVentas), color:'#1F4B43'},
+    {lbl:'Utilidad total', val: CURRENCY.format(totalUtilidad), color:'#3F9142'},
+    {lbl:'Sacos vendidos', val: String(totalSacos), color:'#E86F1F'},
+    {lbl:'Clientes nuevos', val: String(clientesNuevos), color:'#2F6358'},
+  ];
+  let y = 150;
+  stats.forEach(s=>{
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#E4DFD3';
+    ctx.lineWidth = 1;
+    roundRect(ctx, 24, y, W-48, 96, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#6B7770';
+    ctx.font = '16px sans-serif';
+    ctx.fillText(s.lbl, 44, y+36);
+
+    ctx.fillStyle = s.color;
+    ctx.font = 'bold 34px monospace';
+    ctx.fillText(s.val, 44, y+76);
+
+    y += 116;
+  });
+
+  ctx.fillStyle = '#B7B0A2';
+  ctx.font = '13px sans-serif';
+  ctx.fillText('Generado el ' + new Date().toLocaleDateString('es-CL') + ' · Fast Pet', 24, H-16);
+
+  const link = document.createElement('a');
+  link.download = `fastpet_resumen_${ventasMonth}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  showToast('Resumen mensual descargado 🖼️');
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight){
+  const words = text.split(' ');
+  let line = '';
+  let curY = y;
+  for(let i=0;i<words.length;i++){
+    const testLine = line + words[i] + ' ';
+    if(ctx.measureText(testLine).width > maxWidth && line){
+      ctx.fillText(line, x, curY);
+      line = words[i] + ' ';
+      curY += lineHeight;
+    } else {
+      line = testLine;
+    }
+  }
+  ctx.fillText(line, x, curY);
+}
+
+loadState();
+</script>
+</body>
+</html>
